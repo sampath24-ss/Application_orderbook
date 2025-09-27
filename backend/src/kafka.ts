@@ -1,4 +1,4 @@
-//Kafka.ts
+//Kafka.ts - Fixed Version
 import { Kafka, Producer, Consumer, EachMessagePayload } from 'kafkajs';
 import { config } from './config/config';
 import { logger } from './utils/logger';
@@ -11,6 +11,8 @@ export class KafkaService {
     private producer: Producer | null = null;
     private consumer: Consumer | null = null;
     private isConnected: boolean = false;
+    private messageHandlers: Map<string, (payload: EachMessagePayload) => Promise<void>> = new Map();
+    private consumerRunning: boolean = false;
 
     private constructor() {
         this.kafka = new Kafka({
@@ -35,11 +37,9 @@ export class KafkaService {
         try {
             logger.info('Connecting to Kafka...');
 
-    
             this.producer = this.kafka.producer(config.Kafka.producer);
             await this.producer.connect();
 
-    
             this.consumer = this.kafka.consumer({
                 groupId: config.Kafka.groupId,
                 ...config.Kafka.consumer
@@ -49,7 +49,6 @@ export class KafkaService {
             this.isConnected = true;
             logger.info('Successfully connected to Kafka');
 
-    
             await this.createTopics();
 
         } catch (error) {
@@ -60,17 +59,20 @@ export class KafkaService {
 
     public async disconnect(): Promise<void> {
         try {
-            if (this.producer) {
-                await this.producer.disconnect();
-                this.producer = null;
-            }
-
+            this.consumerRunning = false;
+            
             if (this.consumer) {
                 await this.consumer.disconnect();
                 this.consumer = null;
             }
 
+            if (this.producer) {
+                await this.producer.disconnect();
+                this.producer = null;
+            }
+
             this.isConnected = false;
+            this.messageHandlers.clear();
             logger.info('Disconnected from Kafka');
         } catch (error) {
             logger.error('Error disconnecting from Kafka:', error);
@@ -148,24 +150,11 @@ export class KafkaService {
         }
 
         try {
+            // Subscribe to the topic
             await this.consumer.subscribe({ topic, fromBeginning: false });
-
-            await this.consumer.run({
-                eachMessage: async (payload: EachMessagePayload) => {
-                    try {
-                        logger.info(`Received message from topic ${topic}:`, {
-                            partition: payload.partition,
-                            offset: payload.message.offset,
-                            key: payload.message.key?.toString()
-                        });
-
-                        await messageHandler(payload);
-                    } catch (error) {
-                        logger.error(`Error processing message from topic ${topic}:`, error);
-                        throw error;
-                    }
-                }
-            });
+            
+            // Store the message handler for this topic
+            this.messageHandlers.set(topic, messageHandler);
 
             logger.info(`Subscribed to topic: ${topic}`);
         } catch (error) {
@@ -173,6 +162,48 @@ export class KafkaService {
             throw error;
         }
     }
+
+    public async startConsumer(): Promise<void> {
+        if (!this.consumer || !this.isConnected) {
+            throw new Error('Kafka consumer not connected');
+        }
+
+        if (this.consumerRunning) {
+            logger.warn('Consumer is already running');
+            return;
+        }
+
+        try {
+            await this.consumer.run({
+                eachMessage: async (payload: EachMessagePayload) => {
+                    try {
+                        logger.info(`Received message from topic ${payload.topic}:`, {
+                            partition: payload.partition,
+                            offset: payload.message.offset,
+                            key: payload.message.key?.toString()
+                        });
+
+                        const handler = this.messageHandlers.get(payload.topic);
+                        if (handler) {
+                            await handler(payload);
+                        } else {
+                            logger.warn(`No handler found for topic: ${payload.topic}`);
+                        }
+                    } catch (error) {
+                        logger.error(`Error processing message from topic ${payload.topic}:`, error);
+                        throw error;
+                    }
+                }
+            });
+
+            this.consumerRunning = true;
+            logger.info('Kafka consumer started successfully');
+        } catch (error) {
+            logger.error('Failed to start Kafka consumer:', error);
+            throw error;
+        }
+    }
+
     public async publishCustomerEvent(eventType: string, data: any, metadata?: any): Promise<void> {
         const event: KafkaEvent = {
             eventId: uuidv4(),
@@ -213,4 +244,3 @@ export class KafkaService {
         return this.isConnected && this.producer !== null;
     }
 }
-

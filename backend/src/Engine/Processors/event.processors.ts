@@ -59,23 +59,26 @@ export class EventProcessor {
     }
 
     private async subscribeToTopics(): Promise<void> {
-        // Subscribe to customer events
-        await this.kafkaService.subscribeToTopic(
-            config.Kafka.topics.customerEvents,
-            this.handleCustomerEvent.bind(this)
-        );
+    // Subscribe to all topics first (without starting consumer)
+    await this.kafkaService.subscribeToTopic(
+        config.Kafka.topics.customerEvents,
+        this.handleCustomerEvent.bind(this)
+    );
 
-        // Subscribe to customer item events
-        await this.kafkaService.subscribeToTopic(
-            config.Kafka.topics.customerItemsEvents,
-            this.handleCustomerItemEvent.bind(this)
-        );
+    await this.kafkaService.subscribeToTopic(
+        config.Kafka.topics.customerItemsEvents,
+        this.handleCustomerItemEvent.bind(this)
+    );
 
-        // Subscribe to order events
-        await this.kafkaService.subscribeToTopic(
-            config.Kafka.topics.orderEvents,
-            this.handleOrderEvent.bind(this)
-        );
+    await this.kafkaService.subscribeToTopic(
+        config.Kafka.topics.orderEvents,
+        this.handleOrderEvent.bind(this)
+    );
+
+    // Now start the consumer to handle all subscribed topics
+    await this.kafkaService.startConsumer();
+    
+    logger.info('Subscribed to all Kafka topics and started consumer');
     }
 
     private async handleCustomerEvent(payload: EachMessagePayload): Promise<void> {
