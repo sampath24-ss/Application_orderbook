@@ -1,3 +1,4 @@
+//Customer.controller
 import { Request, Response } from 'express';
 import { KafkaService } from '../kafka';
 import { logger } from '../utils/logger';
@@ -21,7 +22,6 @@ const updateCustomerSchema = Joi.object({
     phone: Joi.string().pattern(/^[\+]?[1-9][\d]{0,15}$/).optional(),
     address: Joi.string().max(500).optional()
 }).min(1);
-
 export class CustomerController {
 
     public static async createCustomer(req: Request, res: Response): Promise<void> {

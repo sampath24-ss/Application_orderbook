@@ -1,3 +1,4 @@
+//items.conttoller.ts
 import { Request, Response } from 'express';
 
 import { logger } from '../utils/logger';
@@ -28,7 +29,7 @@ const updateCustomerItemSchema = Joi.object({
 }).min(1);
 
 export class itemController {
- 
+
 
     public static async createCustomerItem(req: Request, res: Response): Promise<void> {
         try {

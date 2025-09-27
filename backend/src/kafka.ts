@@ -1,3 +1,4 @@
+//Kafka.ts
 import { Kafka, Producer, Consumer, EachMessagePayload } from 'kafkajs';
 import { config } from './config/config';
 import { logger } from './utils/logger';
@@ -212,3 +213,4 @@ export class KafkaService {
         return this.isConnected && this.producer !== null;
     }
 }
+
