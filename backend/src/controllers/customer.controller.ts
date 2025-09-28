@@ -41,9 +41,9 @@ export class CustomerController {
 
             res.status(202).json({
                 success: true,
-                data: { 
+                data: {
                     id: customerId,
-                    correlationId 
+                    correlationId
                 },
                 message: 'Customer creation initiated. You will receive real-time updates.',
                 timestamp: new Date()
@@ -61,7 +61,7 @@ export class CustomerController {
 
     public static async updateCustomer(req: Request, res: Response): Promise<void> {
         try {
-            const customerId = req.params.id;
+            const customerId = req.params.id as string;
             const updateData = req.body;
             const correlationId = req.headers['x-correlation-id'] as string || uuidv4();
 
@@ -77,9 +77,9 @@ export class CustomerController {
 
             res.status(202).json({
                 success: true,
-                data: { 
+                data: {
                     id: customerId,
-                    correlationId 
+                    correlationId
                 },
                 message: 'Customer update initiated. You will receive real-time updates.',
                 timestamp: new Date()
@@ -97,7 +97,7 @@ export class CustomerController {
 
     public static async deleteCustomer(req: Request, res: Response): Promise<void> {
         try {
-            const customerId = req.params.id;
+            const customerId = req.params.id as string;
             const correlationId = req.headers['x-correlation-id'] as string || uuidv4();
 
             // Publish to Kafka for async processing
@@ -111,9 +111,9 @@ export class CustomerController {
 
             res.status(202).json({
                 success: true,
-                data: { 
+                data: {
                     id: customerId,
-                    correlationId 
+                    correlationId
                 },
                 message: 'Customer deletion initiated. You will receive real-time updates.',
                 timestamp: new Date()
@@ -131,84 +131,94 @@ export class CustomerController {
 
     // READ OPERATIONS (Sync with Cache-First Pattern)
     public static async getCustomerById(req: Request, res: Response): Promise<void> {
-        const startTime = Date.now();
+    const startTime = Date.now();
+    
+    try {
+        const customerId = req.params.id as string;
         
-        try {
-            const customerId: any = req.params.id;
-            let customer = null;
-            let cacheHit = false;
+        if (!customerId) {
+            res.status(400).json({
+                success: false,
+                message: 'Customer ID is required',
+                timestamp: new Date()
+            });
+            return;
+        }
+        
+        let customer = null;
+        let cacheHit = false;
 
-            // Step 1: Check Redis cache first
-            customer = await CustomerController.redisService.getCachedCustomer(customerId);
+        // Step 1: Check Redis cache first
+        customer = await CustomerController.redisService.getCachedCustomer(customerId);
+        
+        if (customer) {
+            cacheHit = true;
+            logger.debug(`Cache HIT for customer ${customerId}`, {
+                responseTime: Date.now() - startTime
+            });
+        } else {
+            // Step 2: Cache MISS - Query database
+            logger.debug(`Cache MISS for customer ${customerId}`);
+            
+            // Initialize database connection if needed
+            if (!CustomerController.databaseService.isConnected()) {
+                await CustomerController.databaseService.connect();
+            }
+            
+            customer = await CustomerController.databaseService.getCustomerById(customerId);
             
             if (customer) {
-                cacheHit = true;
-                logger.debug(`Cache HIT for customer ${customerId}`, {
-                    responseTime: Date.now() - startTime
-                });
-            } else {
-                // Step 2: Cache MISS - Query database
-                logger.debug(`Cache MISS for customer ${customerId}`);
-                
-                // Initialize database connection if needed
-                if (!CustomerController.databaseService.isConnected()) {
-                    await CustomerController.databaseService.connect();
-                }
-                
-                customer = await CustomerController.databaseService.getCustomerById(customerId);
-                
-                if (customer) {
-                    // Step 3: Update cache for future requests
-                    await CustomerController.redisService.cacheCustomer(customer);
-                    logger.debug(`Cached customer ${customerId} after DB fetch`);
-                }
+                // Step 3: Update cache for future requests
+                await CustomerController.redisService.cacheCustomer(customer);
+                logger.debug(`Cached customer ${customerId} after DB fetch`);
             }
+        }
 
-            const responseTime = Date.now() - startTime;
+        const responseTime = Date.now() - startTime;
 
-            if (!customer) {
-                res.status(404).json({
-                    success: false,
-                    message: 'Customer not found',
-                    timestamp: new Date(),
-                    metadata: {
-                        responseTime,
-                        cacheHit
-                    }
-                });
-                return;
-            }
-
-            res.status(200).json({
-                success: true,
-                data: customer,
-                message: 'Customer retrieved successfully',
+        if (!customer) {
+            res.status(404).json({
+                success: false,
+                message: 'Customer not found',
                 timestamp: new Date(),
                 metadata: {
                     responseTime,
-                    cacheHit,
-                    source: cacheHit ? 'cache' : 'database'
+                    cacheHit
                 }
             });
-
-        } catch (error) {
-            const responseTime = Date.now() - startTime;
-            logger.error('Error getting customer:', error);
-            
-            res.status(500).json({
-                success: false,
-                message: 'Failed to retrieve customer',
-                timestamp: new Date(),
-                metadata: {
-                    responseTime
-                }
-            });
+            return;
         }
+
+        res.status(200).json({
+            success: true,
+            data: customer,
+            message: 'Customer retrieved successfully',
+            timestamp: new Date(),
+            metadata: {
+                responseTime,
+                cacheHit,
+                source: cacheHit ? 'cache' : 'database'
+            }
+        });
+
+    } catch (error) {
+        const responseTime = Date.now() - startTime;
+        logger.error('Error getting customer:', error);
+        
+        res.status(500).json({
+            success: false,
+            message: 'Failed to retrieve customer',
+            timestamp: new Date(),
+            metadata: {
+                responseTime
+            }
+        });
     }
+}
 
     public static async getCustomers(req: Request, res: Response): Promise<void> {
         const startTime = Date.now();
-        
+
         try {
             const page = parseInt(req.query.page as string) || 1;
             const limit = parseInt(req.query.limit as string) || 10;
@@ -219,7 +229,7 @@ export class CustomerController {
 
             // Step 1: Check cache first
             result = await CustomerController.redisService.getCachedCustomerList(page, limit, search);
-            
+
             if (result) {
                 cacheHit = true;
                 logger.debug(`Cache HIT for customer list page:${page} limit:${limit}`, {
@@ -228,14 +238,14 @@ export class CustomerController {
             } else {
                 // Step 2: Cache MISS - Query database
                 logger.debug(`Cache MISS for customer list page:${page} limit:${limit}`);
-                
+
                 // Initialize database connection if needed
                 if (!CustomerController.databaseService.isConnected()) {
                     await CustomerController.databaseService.connect();
                 }
-                
+
                 result = await CustomerController.databaseService.getCustomers(page, limit, search);
-                
+
                 if (result) {
                     // Step 3: Cache the result
                     await CustomerController.redisService.cacheCustomerList(page, limit, search, result);
@@ -270,7 +280,7 @@ export class CustomerController {
         } catch (error) {
             const responseTime = Date.now() - startTime;
             logger.error('Error getting customers:', error);
-            
+
             res.status(500).json({
                 success: false,
                 message: 'Failed to retrieve customers',
@@ -283,34 +293,43 @@ export class CustomerController {
     }
 
     // Cache invalidation endpoint (for testing)
-    public static async invalidateCache(req: Request, res: Response): Promise<void> {
-        try {
-            const customerId:any = req.params.id;
-            
-            const result = await CustomerController.redisService.invalidateCustomer(customerId);
-            
-            res.status(200).json({
-                success: true,
-                data: { invalidated: result },
-                message: 'Cache invalidated successfully',
-                timestamp: new Date()
-            });
-
-        } catch (error) {
-            logger.error('Error invalidating cache:', error);
-            res.status(500).json({
+   public static async invalidateCache(req: Request, res: Response): Promise<void> {
+    try {
+        const customerId = req.params.id as string;
+        
+        if (!customerId) {
+            res.status(400).json({
                 success: false,
-                message: 'Failed to invalidate cache',
+                message: 'Customer ID is required',
                 timestamp: new Date()
             });
+            return;
         }
+        
+        const result = await CustomerController.redisService.invalidateCustomer(customerId);
+        
+        res.status(200).json({
+            success: true,
+            data: { invalidated: result },
+            message: 'Cache invalidated successfully',
+            timestamp: new Date()
+        });
+
+    } catch (error) {
+        logger.error('Error invalidating cache:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to invalidate cache',
+            timestamp: new Date()
+        });
     }
+}
 
     // Cache statistics endpoint
     public static async getCacheStats(req: Request, res: Response): Promise<void> {
         try {
             const stats = await CustomerController.redisService.getCacheStats();
-            
+
             res.status(200).json({
                 success: true,
                 data: stats,

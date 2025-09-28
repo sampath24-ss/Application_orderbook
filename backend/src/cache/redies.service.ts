@@ -1,15 +1,13 @@
-// src/cache/redis.service.ts
+// src/cache/redis.service.ts - Updated with Items and Orders caching
 import Redis from 'ioredis';
 import { logger } from '../utils/logger';
-import { Customer, CustomerItem, CacheOptions } from '../types';
+import { Customer, CustomerItem, Order, CacheOptions } from '../types';
 
-const a: number = 0
 export class RedisService {
     private static instance: RedisService;
     private redis: Redis;
     private connected: boolean = false;
-    //New comment for testing actions
-    
+
     private constructor() {
         const redisConfig: any = {
             host: process.env.REDIS_HOST || 'localhost',
@@ -53,14 +51,22 @@ export class RedisService {
     }
 
     public async connect(): Promise<void> {
-        try {
-            await this.redis.connect();
-            logger.info('Redis service initialized');
-        } catch (error) {
-            logger.error('Failed to connect to Redis:', error);
-            throw error;
-        }
+    // If already connected or connecting, do nothing
+    if (this.connected || (this.redis && (this.redis.status === 'ready' || this.redis.status === 'connecting'))) {
+        logger.info('Redis already connected or connecting');
+        return;
     }
+
+    try {
+        await this.redis.connect(); // use the existing Redis instance
+        this.connected = true;
+        logger.info('Redis connection ready');
+    } catch (error) {
+        this.connected = false;
+        logger.error('Redis connection failed:', error);
+        throw error;
+    }
+}
 
     public isHealthy(): boolean {
         return this.connected && this.redis.status === 'ready';
@@ -119,7 +125,9 @@ export class RedisService {
         }
     }
 
-    // Customer-specific cache operations
+    // ===================
+    // CUSTOMER CACHE OPERATIONS
+    // ===================
     public async cacheCustomer(customer: Customer): Promise<boolean> {
         const key = this.getCustomerKey(customer.id);
         return await this.set(key, customer, this.getTTL('customer'));
@@ -136,6 +144,7 @@ export class RedisService {
         // Also invalidate related lists
         await this.deletePattern('customers:list:*');
         await this.deletePattern(`items:customer:${customerId}*`);
+        await this.deletePattern(`orders:customer:${customerId}*`);
         
         return await this.delete(customerKey);
     }
@@ -160,7 +169,9 @@ export class RedisService {
         return await this.get<{ customers: Customer[]; total: number }>(key);
     }
 
-    // Item-specific cache operations
+    // ===================
+    // ITEM CACHE OPERATIONS
+    // ===================
     public async cacheCustomerItem(item: CustomerItem): Promise<boolean> {
         const key = this.getItemKey(item.id);
         return await this.set(key, item, this.getTTL('item'));
@@ -207,7 +218,82 @@ export class RedisService {
         return await this.get<{ items: CustomerItem[]; total: number }>(key);
     }
 
-    // Cache key generators
+    // ===================
+    // ORDER CACHE OPERATIONS
+    // ===================
+    public async cacheOrder(order: Order): Promise<boolean> {
+        const key = this.getOrderKey(order.id);
+        return await this.set(key, order, this.getTTL('order'));
+    }
+
+    public async getCachedOrder(orderId: string): Promise<Order | null> {
+        const key = this.getOrderKey(orderId);
+        return await this.get<Order>(key);
+    }
+
+    public async invalidateOrder(orderId: string, customerId?: string): Promise<boolean> {
+        const orderKey = this.getOrderKey(orderId);
+        
+        // Invalidate related caches
+        if (customerId) {
+            await this.deletePattern(`orders:customer:${customerId}*`);
+        }
+        await this.deletePattern('orders:list:*');
+        
+        return await this.delete(orderKey);
+    }
+
+    // Customer orders list caching
+    public async cacheCustomerOrdersList(
+        customerId: string,
+        page: number,
+        limit: number,
+        status: string = '',
+        search: string = '',
+        data: { orders: Order[]; total: number }
+    ): Promise<boolean> {
+        const key = this.getCustomerOrdersListKey(customerId, page, limit, status, search);
+        return await this.set(key, data, this.getTTL('orderList'));
+    }
+
+    public async getCachedCustomerOrdersList(
+        customerId: string,
+        page: number,
+        limit: number,
+        status: string = '',
+        search: string = ''
+    ): Promise<{ orders: Order[]; total: number } | null> {
+        const key = this.getCustomerOrdersListKey(customerId, page, limit, status, search);
+        return await this.get<{ orders: Order[]; total: number }>(key);
+    }
+
+    // All orders list caching
+    public async cacheOrdersList(
+        page: number,
+        limit: number,
+        status: string = '',
+        customerId: string = '',
+        search: string = '',
+        data: { orders: Order[]; total: number }
+    ): Promise<boolean> {
+        const key = this.getOrdersListKey(page, limit, status, customerId, search);
+        return await this.set(key, data, this.getTTL('orderList'));
+    }
+
+    public async getCachedOrdersList(
+        page: number,
+        limit: number,
+        status: string = '',
+        customerId: string = '',
+        search: string = ''
+    ): Promise<{ orders: Order[]; total: number } | null> {
+        const key = this.getOrdersListKey(page, limit, status, customerId, search);
+        return await this.get<{ orders: Order[]; total: number }>(key);
+    }
+
+    // ===================
+    // CACHE KEY GENERATORS
+    // ===================
     private getCustomerKey(customerId: string): string {
         return `customer:${customerId}`;
     }
@@ -233,8 +319,39 @@ export class RedisService {
         return `items:customer:${customerId}:${page}:${limit}${categoryPart}${searchPart}`;
     }
 
-    // TTL configuration
-    private getTTL(type: string): number {
+    private getOrderKey(orderId: string): string {
+        return `order:${orderId}`;
+    }
+
+    private getCustomerOrdersListKey(
+        customerId: string,
+        page: number,
+        limit: number,
+        status: string,
+        search: string
+    ): string {
+        const statusPart = status ? `:${status}` : '';
+        const searchPart = search ? `:${Buffer.from(search).toString('base64')}` : '';
+        return `orders:customer:${customerId}:${page}:${limit}${statusPart}${searchPart}`;
+    }
+
+    private getOrdersListKey(
+        page: number,
+        limit: number,
+        status: string,
+        customerId: string,
+        search: string
+    ): string {
+        const statusPart = status ? `:${status}` : '';
+        const customerPart = customerId ? `:${customerId}` : '';
+        const searchPart = search ? `:${Buffer.from(search).toString('base64')}` : '';
+        return `orders:list:${page}:${limit}${statusPart}${customerPart}${searchPart}`;
+    }
+
+    // ===================
+    // TTL CONFIGURATION
+    // ===================
+    public getTTL(type: string): number {
         const ttls = {
             customer: 3600,      // 1 hour
             customerList: 600,   // 10 minutes
@@ -246,7 +363,9 @@ export class RedisService {
         return ttls[type as keyof typeof ttls] || 3600;
     }
 
-    // Cache statistics
+    // ===================
+    // CACHE STATISTICS
+    // ===================
     public async getCacheStats(): Promise<any> {
         try {
             const info = await this.redis.info('memory');
@@ -294,7 +413,9 @@ export class RedisService {
         return keyspace;
     }
 
-    // Cache warming (for popular data)
+    // ===================
+    // CACHE WARMING
+    // ===================
     public async warmCache(): Promise<void> {
         try {
             logger.info('Starting cache warming...');
@@ -308,6 +429,7 @@ export class RedisService {
         }
     }
 
+    
     public async disconnect(): Promise<void> {
         try {
             await this.redis.disconnect();
@@ -318,7 +440,6 @@ export class RedisService {
         }
     }
 
-    // Health check method
     public async ping(): Promise<boolean> {
         try {
             const result = await this.redis.ping();
