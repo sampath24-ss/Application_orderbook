@@ -3,11 +3,13 @@ import Redis from 'ioredis';
 import { logger } from '../utils/logger';
 import { Customer, CustomerItem, CacheOptions } from '../types';
 
+const a: number = 0
 export class RedisService {
     private static instance: RedisService;
     private redis: Redis;
     private connected: boolean = false;
-
+    //New comment for testing actions
+    
     private constructor() {
         const redisConfig: any = {
             host: process.env.REDIS_HOST || 'localhost',
