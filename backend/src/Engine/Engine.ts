@@ -84,17 +84,24 @@ export class Engine {
         }
     }
 
-    public getStatus(): { running: boolean; eventProcessor: boolean } {
+    public isProcessorRunning(): boolean {
+        return this.isRunning;
+    }
+
+    public getStatus(): {
+        services: any; running: boolean; eventProcessor: boolean
+    } {
         return {
             running: this.isRunning,
-            eventProcessor: this.eventProcessor.IsRunning()
+            eventProcessor: this.isRunning,
+            services: undefined,
         };
     }
 }
 
 if (require.main === module) {
     const engine = Engine.getInstance();
-    
+
     engine.start().catch((error) => {
         logger.error('Failed to start Engine:', error);
         process.exit(1);
