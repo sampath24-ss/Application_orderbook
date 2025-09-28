@@ -100,11 +100,11 @@ jobs:
           # Fail if high/critical vulnerabilities found
           HIGH_VULNS=$(npm audit --audit-level=high --parseable | wc -l)
           if [ $HIGH_VULNS -gt 0 ]; then
-            echo "❌ High/Critical vulnerabilities found!"
+            echo "High/Critical vulnerabilities found!"
             npm audit --audit-level=high
             exit 1
           else
-            echo "✅ No high/critical vulnerabilities found"
+            echo "No high/critical vulnerabilities found"
           fi
 
       # Wait for services to be ready
@@ -127,7 +127,7 @@ jobs:
           elif grep -q '"test:unit"' package.json; then
             npm run test:unit
           else
-            echo "⚠️ No test script found in package.json"
+            echo " No test script found in package.json"
             echo "Please add a 'test' script to your package.json"
           fi
 
@@ -141,7 +141,7 @@ jobs:
             echo "Building with TypeScript compiler..."
             npx tsc
           fi
-          echo "✅ Build successful!"
+          echo " Build successful!"
 
       # Generate test coverage (if available)
       - name: Test Coverage
@@ -161,7 +161,7 @@ jobs:
         with:
           script: |
             const jobStatus = '${{ job.status }}';
-            const icon = jobStatus === 'success' ? '✅' : '❌';
+            const icon = jobStatus === 'success' ? 'Yes' : 'No';
             const message = jobStatus === 'success' ? 'All checks passed!' : 'Some checks failed!';
             
             const body = `## ${icon} Code Quality Check Results
@@ -176,7 +176,7 @@ jobs:
             - Unit tests (if configured)
             - Build verification
             
-            ${jobStatus === 'failure' ? '❗ Please fix the failing checks before merging.' : '🎉 Ready for review!'}
+            ${jobStatus === 'failure' ? 'Please fix the failing checks before merging.' : 'Ready for review!'}
             `;
 
             github.rest.issues.createComment({
