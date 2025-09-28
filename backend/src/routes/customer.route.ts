@@ -7,7 +7,7 @@ const router = Router();
 
 router.post('/', asyncHandler(CustomerController.createCustomer));
 
-router.get('/', asyncHandler(CustomerController.getAllCustomers));
+router.get('/', asyncHandler(CustomerController.getCustomers));
 
 router.get('/:id', asyncHandler(CustomerController.getCustomerById));
 
