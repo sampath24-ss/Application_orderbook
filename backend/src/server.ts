@@ -1,12 +1,13 @@
-//server.ts - Complete Fixed Version
+// src/server.ts - Updated with Redis Integration
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import { config } from './config/config';
 import { logger } from './utils/logger';
-import { KafkaService } from './kafka'; // Fixed import path
-import { Engine } from './Engine/Engine'; // Added Engine import
+import { KafkaService } from './kafka';
+import { Engine } from './Engine/Engine';
+import { RedisService } from './cache/redies.service'; // NEW
 import { errorHandler } from './middleware/errorHandler';
 import { requestLogger } from './middleware/requestLogger';
 
@@ -18,13 +19,15 @@ import itemsRoutes from './routes/items.route';
 class App {
     public app: express.Application;
     private kafkaService: KafkaService;
-    private engine: Engine; // Added Engine
-    private isSystemReady: boolean = false; // System readiness flag
+    private engine: Engine;
+    private redisService: RedisService;
+    private isSystemReady: boolean = false;
 
     constructor() {
         this.app = express();
         this.kafkaService = KafkaService.getInstance();
-        this.engine = Engine.getInstance(); // Initialize Engine
+        this.engine = Engine.getInstance();
+        this.redisService = RedisService.getInstance(); // NEW
         this.initializeMiddlewares();
         this.initializeRoutes();
         this.initializeErrorHandling();
@@ -73,11 +76,12 @@ class App {
     }
 
     private initializeRoutes(): void {
-        // Enhanced Health Check - Now includes Engine status
+        // Enhanced Health Check - Now includes Redis status
         this.app.get('/health', (req, res) => {
             const kafkaHealthy = this.kafkaService.isHealthy();
+            const redisHealthy = this.redisService.isHealthy(); // NEW
             const engineStatus = this.engine.getStatus();
-            const systemHealthy = kafkaHealthy && engineStatus.running && engineStatus.eventProcessor && this.isSystemReady;
+            const systemHealthy = kafkaHealthy && redisHealthy && engineStatus.running && engineStatus.eventProcessor && this.isSystemReady;
 
             const status = systemHealthy ? 'healthy' : 'degraded';
             const statusCode = systemHealthy ? 200 : 503;
@@ -90,8 +94,10 @@ class App {
                 components: {
                     api: 'healthy',
                     kafka: kafkaHealthy ? 'healthy' : 'unhealthy',
+                    redis: redisHealthy ? 'healthy' : 'unhealthy', // NEW
                     engine: engineStatus.running ? 'healthy' : 'unhealthy',
-                    eventProcessor: engineStatus.eventProcessor ? 'healthy' : 'unhealthy'
+                    eventProcessor: engineStatus.eventProcessor ? 'healthy' : 'unhealthy',
+                    database: engineStatus.services?.database ? 'healthy' : 'unhealthy'
                 },
                 systemReady: this.isSystemReady
             });
@@ -101,6 +107,7 @@ class App {
         this.app.get('/ready', (req, res) => {
             const ready = this.isSystemReady &&
                 this.kafkaService.isHealthy() &&
+                this.redisService.isHealthy() && // NEW
                 this.engine.getStatus().running &&
                 this.engine.getStatus().eventProcessor;
             const statusCode = ready ? 200 : 503;
@@ -111,83 +118,62 @@ class App {
                 service: 'multi-tenant-api',
                 components: {
                     kafka: this.kafkaService.isHealthy(),
+                    redis: this.redisService.isHealthy(), // NEW
                     engine: this.engine.getStatus().running,
                     eventProcessor: this.engine.getStatus().eventProcessor
                 }
             });
         });
 
-        this.app.get('/api/docs', (req, res) => {
-            res.json({
-                title: 'Multi-Tenant API Documentation',
-                version: '1.0.0',
-                baseUrl: `http://localhost:${config.port}/api`,
-                authentication: {
-                    headers: {
-                        'x-user-id': 'Optional user identifier',
-                        'x-tenant-id': 'Optional tenant identifier',
-                        'x-correlation-id': 'Optional request correlation ID'
-                    }
-                },
-                endpoints: {
-                    customers: {
-                        'POST /api/customers': 'Create a new customer',
-                        'GET /api/customers': 'Get all customers (with pagination)',
-                        'GET /api/customers/:id': 'Get customer by ID',
-                        'PUT /api/customers/:id': 'Update customer',
-                        'DELETE /api/customers/:id': 'Delete customer'
-                    },
-                    items: {
-                        'POST /api/items': 'Create a new item',
-                        'GET /api/items': 'Get all items (with filters)',
-                        'GET /api/items/customer/:customerId': 'Get items for specific customer',
-                        'GET /api/items/item/:id': 'Get item by ID',
-                        'PUT /api/items/item/:id': 'Update item',
-                        'DELETE /api/items/item/:id': 'Delete item',
-                        'PATCH /api/items/item/:id/quantity': 'Update item quantity'
-                    },
-                    orders: {
-                        'POST /api/orders': 'Create a new order',
-                        'GET /api/orders': 'Get all orders (with filters)',
-                        'GET /api/orders/customer/:customerId': 'Get orders for specific customer',
-                        'GET /api/orders/:id': 'Get order by ID',
-                        'PUT /api/orders/:id': 'Update order',
-                        'POST /api/orders/:id/cancel': 'Cancel order',
-                        'DELETE /api/orders/:id': 'Delete order'
-                    }
-                },
-                responseFormat: {
+        // Cache statistics endpoint
+        this.app.get('/cache/stats', async (req, res) => {
+            try {
+                const stats = await this.redisService.getCacheStats();
+                res.json({
                     success: true,
-                    data: 'Response data or null',
-                    message: 'Success/error message',
-                    timestamp: 'ISO timestamp'
-                },
-                asyncProcessing: {
-                    note: 'All operations return 202 Accepted',
-                    realTimeUpdates: 'Subscribe to WebSocket for real-time results',
-                    eventFlow: 'API → Kafka → Engine → Database → Kafka Updates → WebSocket'
-                }
-            });
+                    data: stats,
+                    timestamp: new Date()
+                });
+            } catch (error) {
+                res.status(500).json({
+                    success: false,
+                    message: 'Failed to get cache statistics',
+                    timestamp: new Date()
+                });
+            }
         });
-        // Enhanced API Info
+
+        // Updated API Info
         this.app.get('/api', (req, res) => {
             res.json({
                 name: 'Multi-Tenant Backend API',
                 version: '1.0.0',
-                description: 'Event-driven multi-tenant backend with Kafka integration',
-                architecture: 'Event Sourcing with CQRS',
+                description: 'Event-driven multi-tenant backend with Redis caching and Kafka integration',
+                architecture: 'Event Sourcing with CQRS and Cache-First Reads',
                 components: {
-                    api: 'REST API (Event Publisher)',
+                    api: 'REST API (Hybrid sync/async)',
                     engine: 'Event Processor (Business Logic)',
                     kafka: 'Message Queue & Event Bus',
+                    redis: 'Cache Layer (Performance)', // NEW
                     database: 'PostgreSQL with Optimizations'
                 },
+                features: [
+                    'Cache-first read operations (<50ms response)',
+                    'Async write operations via Kafka',
+                    'Real-time WebSocket updates',
+                    'Automatic cache invalidation',
+                    'Event sourcing and replay capability'
+                ],
                 endpoints: {
                     customers: '/api/customers',
                     customerItems: '/api/items',
                     orders: '/api/orders'
                 },
-                documentation: '/api/docs',
+                monitoring: {
+                    health: '/health',
+                    readiness: '/ready',
+                    cacheStats: '/cache/stats'
+                },
                 timestamp: new Date().toISOString()
             });
         });
@@ -220,24 +206,36 @@ class App {
 
     public async start(): Promise<void> {
         try {
-            logger.info('Starting Multi-Tenant System...');
+            logger.info('Starting Multi-Tenant System with Cache Layer...');
 
-            // Step 1: Initialize Kafka Service
-            logger.info('Step 1: Connecting to Kafka...');
+            // Step 1: Initialize Redis Cache
+            logger.info('Step 1: Connecting to Redis Cache...');
+            await this.redisService.connect();
+            logger.info('Redis cache service initialized successfully');
+
+            // Step 2: Initialize Kafka Service
+            logger.info('Step 2: Connecting to Kafka...');
             await this.kafkaService.connect();
             logger.info('Kafka service initialized successfully');
 
-            // Step 2: Start Engine (Event Processor)
-            logger.info('Step 2: Starting Engine (Event Processor)...');
+            // Step 3: Start Engine (Event Processor)
+            logger.info('Step 3: Starting Engine (Event Processor)...');
             await this.engine.start();
             logger.info('Engine started successfully - Now processing events');
 
-            // Step 3: Mark system as ready
-            this.isSystemReady = true;
-            logger.info('Step 3: System components ready');
+            // Step 4: Warm cache if enabled
+            if (config.cache.enabled) {
+                logger.info('Step 4: Warming cache...');
+                await this.redisService.warmCache();
+                logger.info('Cache warming completed');
+            }
 
-            // Step 4: Start API Server
-            logger.info('Step 4: Starting API Server...');
+            // Step 5: Mark system as ready
+            this.isSystemReady = true;
+            logger.info('Step 5: System components ready');
+
+            // Step 6: Start API Server
+            logger.info('Step 6: Starting API Server...');
             const server = this.app.listen(config.port, () => {
                 logger.info('SYSTEM STARTUP COMPLETE!', {
                     port: config.port,
@@ -248,14 +246,23 @@ class App {
                 logger.info('System Status:', {
                     api: 'Running & Accepting Requests',
                     kafka: 'Connected & Processing Messages',
+                    redis: 'Connected & Caching Data',
                     engine: 'Processing Events from Queue',
                     database: 'Connected & Optimized'
+                });
+
+                logger.info('Performance Features:', {
+                    cacheEnabled: config.cache.enabled,
+                    cacheStrategy: 'Cache-first reads, Write-through updates',
+                    expectedReadLatency: '<50ms (cache hits)',
+                    expectedWriteLatency: '<100ms (async processing)'
                 });
 
                 logger.info('Access Points:', {
                     apiInfo: `http://localhost:${config.port}/api`,
                     healthCheck: `http://localhost:${config.port}/health`,
-                    readinessCheck: `http://localhost:${config.port}/ready`
+                    readinessCheck: `http://localhost:${config.port}/ready`,
+                    cacheStats: `http://localhost:${config.port}/cache/stats`
                 });
 
                 logger.info('Available Endpoints:', {
@@ -265,9 +272,9 @@ class App {
                 });
 
                 logger.info('System Flow:', {
-                    request: 'Browser → API → Kafka Queue → Engine → Database',
-                    response: 'Engine → Database → Kafka Updates → (WebSocket) → Browser',
-                    note: 'All API calls return 202 Accepted - Processing is asynchronous'
+                    reads: 'Browser → API → Redis Cache → Database (fallback) → Response',
+                    writes: 'Browser → API → Kafka → Engine → Database → Cache Update → WebSocket',
+                    caching: 'Write-through updates, Cache-first reads, Smart invalidation'
                 });
             });
 
@@ -323,6 +330,11 @@ class App {
             logger.info('Stopping Engine...');
             await this.engine.stop();
             logger.info('Engine stopped successfully');
+
+            // Disconnect Redis
+            logger.info('Disconnecting Redis...');
+            await this.redisService.disconnect();
+            logger.info('Redis disconnected successfully');
 
             // Disconnect Kafka
             logger.info('Disconnecting Kafka...');

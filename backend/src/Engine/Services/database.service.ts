@@ -41,6 +41,178 @@ export class DatabaseService {
         }
     }
 
+    public async getOrderById(id: string): Promise<any> {
+        try {
+            const query = `
+            SELECT o.*, 
+                   json_agg(
+                       json_build_object(
+                           'id', oi.id,
+                           'itemId', oi.item_id,
+                           'name', oi.name,
+                           'description', oi.description,
+                           'price', oi.price,
+                           'quantity', oi.quantity,
+                           'subtotal', oi.subtotal,
+                           'discountAmount', oi.discount_amount,
+                           'taxAmount', oi.tax_amount,
+                           'sku', oi.sku
+                       )
+                   ) as items
+            FROM orders o
+            LEFT JOIN order_items oi ON o.id = oi.order_id
+            WHERE o.id = $1
+            GROUP BY o.id
+        `;
+
+            const result = await this.executeQuery<any>(query, [id]);
+
+            if (!result || !result.rows || result.rows.length === 0) {
+                return null;
+            }
+
+            const row = result.rows[0];
+            return {
+                id: row.id,
+                customerId: row.customer_id,
+                totalAmount: parseFloat(row.total_amount),
+                status: row.status,
+                orderDate: new Date(row.order_date),
+                deliveryDate: row.delivery_date ? new Date(row.delivery_date) : null,
+                notes: row.notes,
+                paymentStatus: row.payment_status,
+                shippingAddress: row.shipping_address,
+                discount: parseFloat(row.discount || 0),
+                taxAmount: parseFloat(row.tax_amount || 0),
+                shippingCost: parseFloat(row.shipping_cost || 0),
+                orderNumber: row.order_number,
+                priority: row.priority,
+                items: row.items || [],
+                createdAt: new Date(row.created_at),
+                updatedAt: new Date(row.updated_at)
+            };
+        } catch (error) {
+            logger.error('Error getting order by ID:', error);
+            throw error;
+        }
+    }
+
+    public async getCustomerOrders(
+    customerId:  string | undefined,
+    page: number,
+    limit: number,
+    status?: string
+): Promise<{ orders: any[]; total: number }> {
+    const offset = (page - 1) * limit;
+    let query = 'SELECT * FROM orders WHERE customer_id = $1';
+    let countQuery = 'SELECT COUNT(*) FROM orders WHERE customer_id = $1';
+    const params: any[] = [customerId];
+
+    if (status) {
+        query += ' AND status = $2';
+        countQuery += ' AND status = $2';
+        params.push(status);
+    }
+
+    query += ' ORDER BY order_date DESC LIMIT $' + (params.length + 1) + ' OFFSET $' + (params.length + 2);
+    const queryParams = [...params, limit, offset];
+
+    try {
+        const results = await Promise.all([
+            this.executeQuery<any>(query, queryParams),
+            this.executeQuery<{ count: string }>(countQuery, params)
+        ]);
+
+        const orders = results[0];
+        const count = results[1];
+
+        const orderRows = orders?.rows || [];
+        const countRows = count?.rows || [];
+        const totalCount: number = countRows.length > 0 && countRows[0]?.count ? parseInt(countRows[0].count) : 0;
+
+        return {
+            orders: orderRows.map(row => ({
+                id: row.id,
+                customerId: row.customer_id,
+                totalAmount: parseFloat(row.total_amount),
+                status: row.status,
+                orderDate: new Date(row.order_date),
+                deliveryDate: row.delivery_date ? new Date(row.delivery_date) : null,
+                notes: row.notes,
+                paymentStatus: row.payment_status,
+                shippingAddress: row.shipping_address,
+                orderNumber: row.order_number,
+                priority: row.priority,
+                createdAt: new Date(row.created_at),
+                updatedAt: new Date(row.updated_at)
+            })),
+            total: totalCount
+        };
+    } catch (error) {
+        logger.error('Error getting customer orders:', error);
+        throw error;
+    }
+}
+
+    public async getAllOrders(
+        page: number = 1,
+        limit: number = 10,
+        status?: string
+    ): Promise<{ orders: any[]; total: number }> {
+        const offset = (page - 1) * limit;
+        let query = 'SELECT * FROM orders';
+        let countQuery = 'SELECT COUNT(*) FROM orders';
+        const params: any[] = [];
+
+        if (status) {
+            query += ' WHERE status = $1';
+            countQuery += ' WHERE status = $1';
+            params.push(status);
+        }
+
+        query += ' ORDER BY order_date DESC LIMIT $' + (params.length + 1) + ' OFFSET $' + (params.length + 2);
+        const queryParams = [...params, limit, offset];
+
+        try {
+            const results = await Promise.all([
+                this.executeQuery<any>(query, queryParams),
+                this.executeQuery<{ count: string }>(countQuery, params)
+            ]);
+
+            const orders = results[0];
+            const count = results[1];
+
+            const orderRows = orders?.rows || [];
+            const countRows = count?.rows || [];
+            const totalCount = countRows.length > 0 && countRows[0]?.count ? parseInt(countRows[0].count) : 0;
+
+            return {
+                orders: orderRows.map(row => ({
+                    id: row.id,
+                    customerId: row.customer_id,
+                    totalAmount: parseFloat(row.total_amount),
+                    status: row.status,
+                    orderDate: new Date(row.order_date),
+                    deliveryDate: row.delivery_date ? new Date(row.delivery_date) : null,
+                    notes: row.notes,
+                    paymentStatus: row.payment_status,
+                    shippingAddress: row.shipping_address,
+                    discount: parseFloat(row.discount || 0),
+                    taxAmount: parseFloat(row.tax_amount || 0),
+                    shippingCost: parseFloat(row.shipping_cost || 0),
+                    orderNumber: row.order_number,
+                    priority: row.priority,
+                    createdAt: new Date(row.created_at),
+                    updatedAt: new Date(row.updated_at)
+                })),
+                total: totalCount
+            };
+        } catch (error) {
+            logger.error('Error getting all orders:', error);
+            throw error;
+        }
+    }
+
     private async createTables(): Promise<void> {
         const client = await this.pool.connect();
         try {
@@ -266,27 +438,45 @@ export class DatabaseService {
             logger.info('Setting up table partitions for scalability...');
 
             await client.query(`
-                CREATE TABLE IF NOT EXISTS orders_partitioned (
-                    LIKE orders INCLUDING ALL
-                ) PARTITION BY RANGE (order_date)
-            `);
+    CREATE TABLE IF NOT EXISTS orders_partitioned (
+        id UUID NOT NULL,
+        customer_id UUID NOT NULL,
+        total_amount DECIMAL(12,2) NOT NULL,
+        status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+        order_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        delivery_date TIMESTAMP,
+        notes TEXT,
+        payment_status VARCHAR(20) DEFAULT 'PENDING',
+        shipping_address TEXT,
+        discount DECIMAL(10,2) DEFAULT 0,
+        tax_amount DECIMAL(10,2) DEFAULT 0,
+        shipping_cost DECIMAL(10,2) DEFAULT 0,
+        order_number VARCHAR(50),
+        priority VARCHAR(20) DEFAULT 'NORMAL',
+        tenant_id UUID,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id, order_date)
+    ) PARTITION BY RANGE (order_date);
+`);
+
 
             const currentYear = new Date().getFullYear();
             const currentMonth = new Date().getMonth() + 1;
 
             for (let i = 0; i < 12; i++) {
-                const month = ((currentMonth + i - 1) % 12) + 1;
-                const year = currentYear + Math.floor((currentMonth + i - 1) / 12);
-                const nextMonth = (month % 12) + 1;
-                const nextYear = year + Math.floor(month / 12);
+    const month = ((currentMonth + i - 1) % 12) + 1;
+    const year = currentYear + Math.floor((currentMonth + i - 1) / 12);
+    const nextMonth = (month % 12) + 1;
+    const nextYear = year + Math.floor(month / 12);
 
-                await client.query(`
-                    CREATE TABLE IF NOT EXISTS orders_${year}_${month.toString().padStart(2, '0')} 
-                    PARTITION OF orders_partitioned
-                    FOR VALUES FROM ('${year}-${month.toString().padStart(2, '0')}-01') 
-                    TO ('${nextYear}-${nextMonth.toString().padStart(2, '0')}-01')
-                `);
-            }
+    await client.query(`
+        CREATE TABLE IF NOT EXISTS orders_${year}_${month.toString().padStart(2, '0')} 
+        PARTITION OF orders_partitioned
+        FOR VALUES FROM ('${year}-${month.toString().padStart(2, '0')}-01') 
+        TO ('${nextYear}-${nextMonth.toString().padStart(2, '0')}-01')
+    `);
+}
 
             logger.info('Table partitions created successfully');
 
