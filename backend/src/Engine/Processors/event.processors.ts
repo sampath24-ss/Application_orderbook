@@ -1,25 +1,19 @@
-// backend/src/Engine/Processors/event.processors.ts
+// src/Engine/Processors/event.processors.ts - Updated with Cache Integration
 import { KafkaService } from '../../kafka';
 import { DatabaseService } from '../Services/database.service';
+import { RedisService } from '../../cache/redies.service'; // NEW
 import { CustomerService } from '../Services/customer.service';
 import { ItemService } from '../Services/item.service';
 import { OrderService } from '../Services/order.service';
 import { logger } from '../../utils/logger';
 import { EachMessagePayload } from 'kafkajs';
-import { 
-    CustomerEvent, 
-    CustomerItemEvent, 
-    OrderEvent,
-    CustomerUpdateEventType,
-    ItemUpdateEventType,
-    OrderUpdateEventType
-} from '../../types';
 import { config } from '../../config/config';
 
 export class EventProcessor {
     private static instance: EventProcessor;
     private kafkaService: KafkaService;
     private databaseService: DatabaseService;
+    private redisService: RedisService; // NEW
     private customerService: CustomerService;
     private itemService: ItemService;
     private orderService: OrderService;
@@ -28,6 +22,7 @@ export class EventProcessor {
     private constructor() {
         this.kafkaService = KafkaService.getInstance();
         this.databaseService = new DatabaseService();
+        this.redisService = RedisService.getInstance(); // NEW
         this.customerService = new CustomerService(this.databaseService);
         this.itemService = new ItemService(this.databaseService);
         this.orderService = new OrderService(this.databaseService, this.itemService);
@@ -47,8 +42,14 @@ export class EventProcessor {
             // Connect to database
             await this.databaseService.connect();
 
+            // Connect to Redis cache
+            await this.redisService.connect(); // NEW
+
             // Subscribe to Kafka topics
             await this.subscribeToTopics();
+
+            // Start Kafka consumer
+            await this.kafkaService.startConsumer(); // NEW
 
             this.isRunning = true;
             logger.info('Event Processor started successfully');
@@ -59,398 +60,303 @@ export class EventProcessor {
     }
 
     private async subscribeToTopics(): Promise<void> {
-    // Subscribe to all topics first (without starting consumer)
-    await this.kafkaService.subscribeToTopic(
-        config.Kafka.topics.customerEvents,
-        this.handleCustomerEvent.bind(this)
-    );
+        // Subscribe to all topics first (without starting consumer)
+        await this.kafkaService.subscribeToTopic(
+            config.Kafka.topics.customerEvents,
+            this.handleCustomerEvent.bind(this)
+        );
 
-    await this.kafkaService.subscribeToTopic(
-        config.Kafka.topics.customerItemsEvents,
-        this.handleCustomerItemEvent.bind(this)
-    );
+        await this.kafkaService.subscribeToTopic(
+            config.Kafka.topics.customerItemsEvents,
+            this.handleCustomerItemEvent.bind(this)
+        );
 
-    await this.kafkaService.subscribeToTopic(
-        config.Kafka.topics.orderEvents,
-        this.handleOrderEvent.bind(this)
-    );
+        await this.kafkaService.subscribeToTopic(
+            config.Kafka.topics.orderEvents,
+            this.handleOrderEvent.bind(this)
+        );
 
-    // Now start the consumer to handle all subscribed topics
-    await this.kafkaService.startConsumer();
-    
-    logger.info('Subscribed to all Kafka topics and started consumer');
+        logger.info('Subscribed to all Kafka topics');
     }
 
     private async handleCustomerEvent(payload: EachMessagePayload): Promise<void> {
-        try {
-            const message = JSON.parse(payload.message.value?.toString() || '{}');
-            const event: CustomerEvent = message;
+    try {
+        const message = JSON.parse(payload.message.value?.toString() || '{}');
+        const { eventType, data, metadata } = message;
 
-            logger.info(`Processing customer event: ${event.eventType}`, { 
-                eventId: event.eventId,
-                correlationId: event.metadata?.correlationId 
-            });
+        logger.info(`Processing customer event: ${eventType}`, {
+            eventId: message.eventId,
+            correlationId: metadata?.correlationId
+        });
 
-            let updateEventType: CustomerUpdateEventType;
-            let responseData: any;
-            let success = true;
-            let errorMessage: string | undefined;
+        let responseData: any = null;
+        let success = false;
 
-            try {
-                switch (event.eventType) {
-                    case 'CUSTOMER_CREATED':
-                        responseData = await this.customerService.createCustomer(event.data);
-                        updateEventType = 'CUSTOMER_CREATED_SUCCESS';
-                        break;
+        switch (eventType) {
+            case 'CUSTOMER_CREATE_REQUESTED':
+                responseData = await this.customerService.createCustomer(data);
+                success = true;
 
-                    case 'CUSTOMER_UPDATED':
-                        responseData = await this.customerService.updateCustomer(event.data.id, event.data);
-                        updateEventType = responseData ? 'CUSTOMER_UPDATED_SUCCESS' : 'CUSTOMER_UPDATED_FAILED';
-                        if (!responseData) {
-                            success = false;
-                            errorMessage = 'Customer not found';
-                        }
-                        break;
-
-                    case 'CUSTOMER_DELETED':
-                        const deleted = await this.customerService.deleteCustomer(event.data.id);
-                        updateEventType = deleted ? 'CUSTOMER_DELETED_SUCCESS' : 'CUSTOMER_DELETED_FAILED';
-                        responseData = { deleted, customerId: event.data.id };
-                        if (!deleted) {
-                            success = false;
-                            errorMessage = 'Customer not found or could not be deleted';
-                        }
-                        break;
-
-                    case 'CUSTOMER_REQUESTED':
-                        responseData = await this.customerService.getCustomerById(event.data.id);
-                        updateEventType = responseData ? 'CUSTOMER_FOUND' : 'CUSTOMER_NOT_FOUND';
-                        if (!responseData) {
-                            success = false;
-                            errorMessage = 'Customer not found';
-                        }
-                        break;
-
-                    case 'CUSTOMERS_REQUESTED':
-                        responseData = await this.customerService.getCustomers(
-                            event.data.page,
-                            event.data.limit,
-                            event.data.search
-                        );
-                        updateEventType = 'CUSTOMERS_LIST_RESPONSE';
-                        break;
-
-                    default:
-                        logger.warn(`Unknown customer event type: ${event.eventType}`);
-                        return;
+                if (responseData) {
+                    await this.redisService.cacheCustomer(responseData);
+                    await this.redisService.deletePattern('customers:list:*');
                 }
-            } catch (serviceError) {
-                success = false;
-                errorMessage = serviceError instanceof Error ? serviceError.message : 'Unknown error';
-                updateEventType = this.getFailureEventType(event.eventType);
-                responseData = { error: errorMessage };
-            }
+                break;
 
-            // Publish update event
-            await this.publishUpdateEvent(
-                config.Kafka.topics.customerUpdates,
-                updateEventType,
-                {
-                    success,
-                    data: responseData,
-                    error: errorMessage,
-                    originalEvent: {
-                        eventId: event.eventId,
-                        eventType: event.eventType,
-                        correlationId: event.metadata?.correlationId
-                    }
-                },
-                event.metadata
-            );
+            case 'CUSTOMER_UPDATE_REQUESTED':
+                responseData = await this.customerService.updateCustomer(data.id, data);
+                success = true;
 
-        } catch (error) {
-            logger.error('Error handling customer event:', error);
-            throw error;
+                if (responseData) {
+                    await this.redisService.cacheCustomer(responseData);
+                    await this.redisService.deletePattern('customers:list:*');
+                }
+                break;
+
+            case 'CUSTOMER_DELETE_REQUESTED':
+                success = await this.customerService.deleteCustomer(data.id);
+
+                if (success) {
+                    await this.redisService.invalidateCustomer(data.id);
+                }
+                break;
+
+            default:
+                logger.warn(`Unknown customer event type: ${eventType}`);
+                return;
         }
+
+        // Publish update event for real-time notifications
+        await this.kafkaService.publishEvent(config.Kafka.topics.customerUpdates, {
+            eventId: message.eventId + '-response',
+            eventType: eventType.replace('_REQUESTED', '_COMPLETED'),
+            timestamp: new Date(),
+            data: {
+                success,
+                data: responseData,
+                originalEventId: message.eventId
+            },
+            metadata
+        });
+
+        logger.info(`Customer event processed successfully: ${eventType}`, {
+            success,
+            correlationId: metadata?.correlationId
+        });
+
+    } catch (error) {
+        logger.error('Error processing customer event:', error);
+
+        const message = JSON.parse(payload.message.value?.toString() || '{}');
+        await this.kafkaService.publishEvent(config.Kafka.topics.customerUpdates, {
+            eventId: message.eventId + '-error',
+            eventType: message.eventType.replace('_REQUESTED', '_FAILED'),
+            timestamp: new Date(),
+            data: {
+                success: false,
+                error: error,
+                originalEventId: message.eventId
+            },
+            metadata: message.metadata
+        });
     }
+}
 
     private async handleCustomerItemEvent(payload: EachMessagePayload): Promise<void> {
         try {
             const message = JSON.parse(payload.message.value?.toString() || '{}');
-            const event: CustomerItemEvent = message;
+            const { eventType, data, metadata } = message;
 
-            logger.info(`Processing customer item event: ${event.eventType}`, { 
-                eventId: event.eventId,
-                correlationId: event.metadata?.correlationId 
+            logger.info(`Processing item event: ${eventType}`, {
+                eventId: message.eventId,
+                correlationId: metadata?.correlationId
             });
 
-            let updateEventType: ItemUpdateEventType;
-            let responseData: any;
-            let success = true;
-            let errorMessage: string | undefined;
+            let responseData: any = null;
+            let success = false;
 
-            try {
-                switch (event.eventType) {
-                    case 'ITEM_CREATED':
-                        responseData = await this.itemService.createCustomerItem(event.data);
-                        updateEventType = 'ITEM_CREATED_SUCCESS';
-                        break;
+            switch (eventType) {
+                case 'ITEM_CREATE_REQUESTED':
+                    responseData = await this.itemService.createCustomerItem(data);
+                    success = true;
 
-                    case 'ITEM_UPDATED':
-                        responseData = await this.itemService.updateCustomerItem(event.data.id, event.data);
-                        updateEventType = responseData ? 'ITEM_UPDATED_SUCCESS' : 'ITEM_UPDATED_FAILED';
-                        if (!responseData) {
-                            success = false;
-                            errorMessage = 'Item not found';
-                        }
-                        break;
+                    // Update cache
+                    if (responseData) {
+                        await this.redisService.cacheCustomerItem(responseData);
+                        // Invalidate customer item lists
+                        await this.redisService.deletePattern(`items:customer:${data.customerId}*`);
+                        await this.redisService.deletePattern('items:list:*');
+                    }
+                    break;
 
-                    case 'ITEM_DELETED':
-                        const deleted = await this.itemService.deleteCustomerItem(event.data.id);
-                        updateEventType = deleted ? 'ITEM_DELETED_SUCCESS' : 'ITEM_DELETED_FAILED';
-                        responseData = { deleted, itemId: event.data.id };
-                        if (!deleted) {
-                            success = false;
-                            errorMessage = 'Item not found or could not be deleted';
-                        }
-                        break;
+                case 'ITEM_UPDATE_REQUESTED':
+                    responseData = await this.itemService.updateCustomerItem(data.id, data);
+                    success = true;
 
-                    case 'ITEM_REQUESTED':
-                        responseData = await this.itemService.getCustomerItemById(event.data.itemId);
-                        updateEventType = responseData ? 'ITEM_FOUND' : 'ITEM_NOT_FOUND';
-                        if (!responseData) {
-                            success = false;
-                            errorMessage = 'Item not found';
-                        }
-                        break;
+                    // Update cache
+                    if (responseData) {
+                        await this.redisService.cacheCustomerItem(responseData);
+                        await this.redisService.deletePattern(`items:customer:${responseData.customerId}*`);
+                    }
+                    break;
 
-                    case 'ITEMS_REQUESTED':
-                        responseData = await this.itemService.getCustomerItems(
-                            event.data.customerId,
-                            event.data.page,
-                            event.data.limit,
-                            event.data.category,
-                            event.data.search
-                        );
-                        updateEventType = 'CUSTOMER_ITEMS_RESPONSE';
-                        break;
+                case 'ITEM_DELETE_REQUESTED':
+                    // Get item first to know which customer cache to invalidate
+                    const existingItem = await this.redisService.getCachedCustomerItem(data.id);
+                    success = await this.itemService.deleteCustomerItem(data.id);
 
-                    case 'ALL_ITEMS_REQUESTED':
-                        responseData = await this.itemService.getAllItems(
-                            event.data.page,
-                            event.data.limit,
-                            event.data.category,
-                            event.data.search,
-                            event.data.customerId
-                        );
-                        updateEventType = 'ALL_ITEMS_RESPONSE';
-                        break;
+                    // Remove from cache
+                    if (success) {
+                        await this.redisService.invalidateCustomerItem(data.id, existingItem?.customerId);
+                    }
+                    break;
 
-                    case 'ITEM_QUANTITY_UPDATED':
-                        responseData = await this.itemService.updateItemQuantity(
-                            event.data.id,
-                            event.data.quantity,
-                            event.data.operation
-                        );
-                        updateEventType = responseData ? 'ITEM_QUANTITY_UPDATED_SUCCESS' : 'ITEM_QUANTITY_UPDATED_FAILED';
-                        if (!responseData) {
-                            success = false;
-                            errorMessage = 'Failed to update item quantity';
-                        }
-                        break;
-
-                    default:
-                        logger.warn(`Unknown customer item event type: ${event.eventType}`);
-                        return;
-                }
-            } catch (serviceError) {
-                success = false;
-                errorMessage = serviceError instanceof Error ? serviceError.message : 'Unknown error';
-                updateEventType = this.getItemFailureEventType(event.eventType);
-                responseData = { error: errorMessage };
+                default:
+                    logger.warn(`Unknown item event type: ${eventType}`);
+                    return;
             }
 
             // Publish update event
-            await this.publishUpdateEvent(
-                config.Kafka.topics.itemUpdates,
-                updateEventType,
-                {
+            await this.kafkaService.publishEvent(config.Kafka.topics.itemUpdates, {
+                eventId: message.eventId + '-response',
+                eventType: eventType.replace('_REQUESTED', '_COMPLETED'),
+                timestamp: new Date(),
+                data: {
                     success,
                     data: responseData,
-                    error: errorMessage,
-                    originalEvent: {
-                        eventId: event.eventId,
-                        eventType: event.eventType,
-                        correlationId: event.metadata?.correlationId
-                    }
+                    originalEventId: message.eventId
                 },
-                event.metadata
-            );
+                metadata
+            });
 
         } catch (error) {
-            logger.error('Error handling customer item event:', error);
-            throw error;
+            logger.error('Error processing item event:', error);
+
+            // Publish error event
+            const message = JSON.parse(payload.message.value?.toString() || '{}');
+            await this.kafkaService.publishEvent(config.Kafka.topics.itemUpdates, {
+                eventId: message.eventId + '-error',
+                eventType: message.eventType.replace('_REQUESTED', '_FAILED'),
+                timestamp: new Date(),
+                data: {
+                    success: false,
+                    error: error,
+                    originalEventId: message.eventId
+                },
+                metadata: message.metadata
+            });
         }
     }
 
     private async handleOrderEvent(payload: EachMessagePayload): Promise<void> {
         try {
             const message = JSON.parse(payload.message.value?.toString() || '{}');
-            const event: OrderEvent = message;
+            const { eventType, data, metadata } = message;
 
-            logger.info(`Processing order event: ${event.eventType}`, { 
-                eventId: event.eventId,
-                correlationId: event.metadata?.correlationId 
+            logger.info(`Processing order event: ${eventType}`, {
+                eventId: message.eventId,
+                correlationId: metadata?.correlationId
             });
 
-            let updateEventType: OrderUpdateEventType;
-            let responseData: any;
-            let success = true;
-            let errorMessage: string | undefined;
+            let responseData: any | null = null;
+            let success: boolean = false;
 
-            try {
-                switch (event.eventType) {
-                    case 'ORDER_CREATED':
-                        responseData = await this.orderService.createOrder(event.data);
-                        updateEventType = 'ORDER_CREATED_SUCCESS';
-                        break;
+            switch (eventType) {
+                case 'ORDER_CREATE_REQUESTED':
+                    responseData = await this.orderService.createOrder(data);
+                    success = true;
 
-                    case 'ORDER_UPDATED':
-                        responseData = await this.orderService.updateOrder(event.data.id, event.data);
-                        updateEventType = responseData ? 'ORDER_UPDATED_SUCCESS' : 'ORDER_UPDATED_FAILED';
-                        if (!responseData) {
-                            success = false;
-                            errorMessage = 'Order not found';
-                        }
-                        break;
+                    // Cache invalidation for orders
+                    if (responseData) {
+                        await this.redisService.deletePattern(`orders:customer:${data.customerId}*`);
+                        await this.redisService.deletePattern('orders:list:*');
+                    }
+                    break;
 
-                    case 'ORDER_CANCELLED':
-                        responseData = await this.orderService.cancelOrder(event.data.id, event.data.reason);
-                        updateEventType = responseData ? 'ORDER_CANCELLED_SUCCESS' : 'ORDER_CANCEL_FAILED';
-                        if (!responseData) {
-                            success = false;
-                            errorMessage = 'Order not found or cannot be cancelled';
-                        }
-                        break;
+                case 'ORDER_UPDATE_REQUESTED':
+                    responseData = await this.orderService.updateOrder(data.id, data);
+                    success = true;
 
-                    case 'ORDER_REQUESTED':
-                        responseData = await this.orderService.getOrderById(event.data.orderId);
-                        updateEventType = responseData ? 'ORDER_FOUND' : 'ORDER_NOT_FOUND';
-                        if (!responseData) {
-                            success = false;
-                            errorMessage = 'Order not found';
-                        }
-                        break;
+                    // Cache invalidation
+                    if (responseData) {
+                        await this.redisService.deletePattern(`orders:customer:${responseData.customerId}*`);
+                    }
+                    break;
 
-                    case 'ORDER_DELETED':
-                        const deleted = await this.orderService.deleteOrder(event.data.id);
-                        updateEventType = deleted ? 'ORDER_DELETED_SUCCESS' : 'ORDER_DELETE_FAILED';
-                        responseData = { deleted, orderId: event.data.id };
-                        if (!deleted) {
-                            success = false;
-                            errorMessage = 'Order not found or could not be deleted';
-                        }
-                        break;
+                case 'ORDER_CANCEL_REQUESTED':
+                    const cancelResult = await this.orderService.cancelOrder(data.id);
+                    success = cancelResult !== null; // Convert Order|null to boolean
+                    responseData = cancelResult;
+                    break;
 
-                    default:
-                        logger.warn(`Unknown order event type: ${event.eventType}`);
-                        return;
-                }
-            } catch (serviceError) {
-                success = false;
-                errorMessage = serviceError instanceof Error ? serviceError.message : 'Unknown error';
-                updateEventType = this.getOrderFailureEventType(event.eventType);
-                responseData = { error: errorMessage };
+                default:
+                    logger.warn(`Unknown order event type: ${eventType}`);
+                    return;
             }
 
             // Publish update event
-            await this.publishUpdateEvent(
-                config.Kafka.topics.orderUpdates,
-                updateEventType,
-                {
+            await this.kafkaService.publishEvent(config.Kafka.topics.orderUpdates, {
+                eventId: message.eventId + '-response',
+                eventType: eventType.replace('_REQUESTED', '_COMPLETED'),
+                timestamp: new Date(),
+                data: {
                     success,
                     data: responseData,
-                    error: errorMessage,
-                    originalEvent: {
-                        eventId: event.eventId,
-                        eventType: event.eventType,
-                        correlationId: event.metadata?.correlationId
-                    }
+                    originalEventId: message.eventId
                 },
-                event.metadata
-            );
-
-        } catch (error) {
-            logger.error('Error handling order event:', error);
-            throw error;
-        }
-    }
-
-    private async publishUpdateEvent(
-        topic: string,
-        eventType: string,
-        data: any,
-        originalMetadata?: any
-    ): Promise<void> {
-        try {
-            await this.kafkaService.publishEvent(topic, {
-                eventId: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                eventType,
-                timestamp: new Date(),
-                data,
-                metadata: {
-                    ...originalMetadata,
-                    source: 'ENGINE' as const,
-                    processedAt: new Date()
-                }
+                metadata
             });
+
         } catch (error) {
-            logger.error(`Failed to publish update event to ${topic}:`, error);
-            throw error;
+            logger.error('Error processing order event:', error);
+
+            // Publish error event
+            const message = JSON.parse(payload.message.value?.toString() || '{}');
+            await this.kafkaService.publishEvent(config.Kafka.topics.orderUpdates, {
+                eventId: message.eventId + '-error',
+                eventType: message.eventType.replace('_REQUESTED', '_FAILED'),
+                timestamp: new Date(),
+                data: {
+                    success: false,
+                    error: error,
+                    originalEventId: message.eventId
+                },
+                metadata: message.metadata
+            });
         }
     }
 
-    private getFailureEventType(eventType: string): CustomerUpdateEventType {
-        switch (eventType) {
-            case 'CUSTOMER_CREATED': return 'CUSTOMER_CREATED_FAILED';
-            case 'CUSTOMER_UPDATED': return 'CUSTOMER_UPDATED_FAILED';
-            case 'CUSTOMER_DELETED': return 'CUSTOMER_DELETED_FAILED';
-            default: return 'CUSTOMER_UPDATED_FAILED';
-        }
+    public getStatus(): any {
+        return {
+            running: this.isRunning,
+            eventProcessor: this.isRunning,
+            services: {
+                database: this.databaseService.isConnected(),
+                redis: this.redisService.isHealthy(),
+                kafka: this.kafkaService.isHealthy()
+            }
+        };
     }
 
-    private getItemFailureEventType(eventType: string): ItemUpdateEventType {
-        switch (eventType) {
-            case 'ITEM_CREATED': return 'ITEM_CREATED_FAILED';
-            case 'ITEM_UPDATED': return 'ITEM_UPDATED_FAILED';
-            case 'ITEM_DELETED': return 'ITEM_DELETED_FAILED';
-            case 'ITEM_QUANTITY_UPDATED': return 'ITEM_QUANTITY_UPDATED_FAILED';
-            default: return 'ITEM_UPDATED_FAILED';
-        }
-    }
-
-    private getOrderFailureEventType(eventType: string): OrderUpdateEventType {
-        switch (eventType) {
-            case 'ORDER_CREATED': return 'ORDER_CREATED_FAILED';
-            case 'ORDER_UPDATED': return 'ORDER_UPDATED_FAILED';
-            case 'ORDER_CANCELLED': return 'ORDER_CANCEL_FAILED';
-            case 'ORDER_DELETED': return 'ORDER_DELETE_FAILED';
-            default: return 'ORDER_UPDATED_FAILED';
-        }
+    public isProcessorRunning(): boolean {
+        return this.isRunning;
     }
 
     public async stop(): Promise<void> {
         try {
             this.isRunning = false;
+
+            // Disconnect Redis
+            await this.redisService.disconnect();
+
+            // Disconnect database
             await this.databaseService.disconnect();
+
             logger.info('Event Processor stopped successfully');
         } catch (error) {
             logger.error('Error stopping Event Processor:', error);
-            throw error;
         }
     }
 
-    public IsRunning(): boolean {
-        return this.isRunning;
-    }
 }
+
