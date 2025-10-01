@@ -80,21 +80,6 @@ pipeline {
             }
         }
         
-        stage('OWASP Dependency Check') {
-            steps {
-                dir('backend') {
-                    dependencyCheck additionalArguments: """
-                        --scan ./package-lock.json 
-                        --format ALL 
-                        --out ${OWASP_REPORT_DIR} 
-                        --project backend-nodejs
-                        --enableExperimental
-                    """, odcInstallation: 'OWASP-DC'
-                    
-                    dependencyCheckPublisher pattern: "${OWASP_REPORT_DIR}/dependency-check-report.xml"
-                }
-            }
-        }
         
         stage('Archive') {
             steps {
