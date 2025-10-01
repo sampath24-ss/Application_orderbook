@@ -9,6 +9,7 @@ router.post('/', asyncHandler(CustomerController.createCustomer));
 
 router.get('/', asyncHandler(CustomerController.getCustomers));
 
+
 router.get('/:id', asyncHandler(CustomerController.getCustomerById));
 
 router.put('/:id', asyncHandler(CustomerController.updateCustomer));
