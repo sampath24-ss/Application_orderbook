@@ -43,7 +43,7 @@ export class EventProcessor {
             await this.databaseService.connect();
 
             // Connect to Redis cache
-            await this.redisService.connect(); // NEW
+            const redis = this.redisService.getClient();
 
             // Subscribe to Kafka topics
             await this.subscribeToTopics();

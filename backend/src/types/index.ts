@@ -497,23 +497,23 @@ export interface EventProcessingResult {
 
 // WebSocket message types
 export interface WebSocketMessage {
-    type: 'EVENT_UPDATE' | 'SUBSCRIPTION_ACK' | 'ERROR' | 'HEARTBEAT' | 'CONNECTION_ACK';
+    type: 'EVENT_UPDATE' | 'SUBSCRIPTION_ACK' | 'ERROR' | 'HEARTBEAT' | 'CONNECTION_ACK'| 'PONG';
     data: any;
     timestamp: Date;
     correlationId?: string;
 }
 
 export interface WebSocketSubscription {
-    userId?: string;
-    tenantId?: string;
+    userId?: string | undefined;
+    tenantId?: string | undefined;
     eventTypes: string[];
     channels: string[];
 }
 
 export interface WebSocketClient {
     id: string;
-    userId?: string;
-    tenantId?: string;
+    userId?: string | undefined;
+    tenantId?: string | undefined;
     subscriptions: WebSocketSubscription[];
     connectedAt: Date;
     lastActivity: Date;

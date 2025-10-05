@@ -68,6 +68,12 @@ export class RedisService {
     }
 }
 
+public getClient(): Redis {
+    if (!this.redis) {
+        throw new Error('Redis client is not initialized');
+    }
+    return this.redis;
+}
     public isHealthy(): boolean {
         return this.connected && this.redis.status === 'ready';
     }

@@ -31,7 +31,3 @@ Thumbs.db
 logs
 *.log
 
-# Optional: ignore all package.json if you really need to
-package.json
-backend/package.json
-frontend/package.json
