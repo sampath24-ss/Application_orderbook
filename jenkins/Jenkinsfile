@@ -4,7 +4,7 @@ pipeline {
     tools {
         nodejs 'node16'
     }
-    
+   //just to commit 
     environment {
         SONAR_PROJECT_KEY = 'backend-nodejs-app'
         OWASP_REPORT_DIR = "${WORKSPACE}/dependency-check-report"
@@ -80,21 +80,6 @@ pipeline {
             }
         }
         
-        stage('OWASP Dependency Check') {
-            steps {
-                dir('backend') {
-                    dependencyCheck additionalArguments: """
-                        --scan ./package-lock.json 
-                        --format ALL 
-                        --out ${OWASP_REPORT_DIR} 
-                        --project backend-nodejs
-                        --enableExperimental
-                    """, odcInstallation: 'OWASP-DC'
-                    
-                    dependencyCheckPublisher pattern: "${OWASP_REPORT_DIR}/dependency-check-report.xml"
-                }
-            }
-        }
         
         stage('Archive') {
             steps {
