@@ -5,7 +5,9 @@ const CustomerForm = ({ onSubmit, onCancel, initialData = null }) => {
         name: '',
         email: '',
         phone: '',
-        address: ''
+        address: '',
+        city: '',
+        country: ''
     });
 
     useEffect(() => {
@@ -36,7 +38,7 @@ const CustomerForm = ({ onSubmit, onCancel, initialData = null }) => {
                     <input
                         type="text"
                         name="name"
-                        placeholder="Name *"
+                        placeholder="Customer Name *"
                         value={formData.name}
                         onChange={handleChange}
                         required
@@ -61,19 +63,35 @@ const CustomerForm = ({ onSubmit, onCancel, initialData = null }) => {
                     />
                     <input
                         type="text"
-                        name="address"
-                        placeholder="Address"
-                        value={formData.address}
+                        name="city"
+                        placeholder="City"
+                        value={formData.city}
+                        onChange={handleChange}
+                        className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <input
+                        type="text"
+                        name="country"
+                        placeholder="Country"
+                        value={formData.country}
                         onChange={handleChange}
                         className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                 </div>
+                <textarea
+                    name="address"
+                    placeholder="Address"
+                    value={formData.address}
+                    onChange={handleChange}
+                    rows="3"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
                 <div className="flex gap-3">
                     <button
                         type="submit"
                         className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition"
                     >
-                        {initialData ? 'Update' : 'Create'}
+                        {initialData ? 'Update Customer' : 'Create Customer'}
                     </button>
                     <button
                         type="button"

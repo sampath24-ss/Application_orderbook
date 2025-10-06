@@ -1,4 +1,3 @@
-// src/pages/ItemsPage.jsx
 import React, { useState } from 'react';
 import { Package, Plus } from 'lucide-react';
 import { useItems } from '../hooks/useItems';

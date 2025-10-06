@@ -67,22 +67,6 @@ const ItemForm = ({ onSubmit, onCancel, initialData = null, customers = [] }) =>
                         className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                     />
                     <input
-                        type="text"
-                        name="description"
-                        placeholder="Description"
-                        value={formData.description}
-                        onChange={handleChange}
-                        className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                    <input
-                        type="text"
-                        name="category"
-                        placeholder="Category"
-                        value={formData.category}
-                        onChange={handleChange}
-                        className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                    <input
                         type="number"
                         name="price"
                         step="0.01"
@@ -101,13 +85,29 @@ const ItemForm = ({ onSubmit, onCancel, initialData = null, customers = [] }) =>
                         required
                         className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                     />
+                    <input
+                        type="text"
+                        name="category"
+                        placeholder="Category"
+                        value={formData.category}
+                        onChange={handleChange}
+                        className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
                 </div>
+                <textarea
+                    name="description"
+                    placeholder="Description"
+                    value={formData.description}
+                    onChange={handleChange}
+                    rows="3"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
                 <div className="flex gap-3">
                     <button
                         type="submit"
                         className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition"
                     >
-                        {initialData ? 'Update' : 'Create'}
+                        {initialData ? 'Update Item' : 'Create Item'}
                     </button>
                     <button
                         type="button"

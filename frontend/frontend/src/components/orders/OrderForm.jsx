@@ -1,4 +1,3 @@
-// src/components/orders/OrderForm.jsx
 import React, { useState } from 'react';
 
 const OrderForm = ({ onSubmit, onCancel, customers = [] }) => {
@@ -6,14 +5,18 @@ const OrderForm = ({ onSubmit, onCancel, customers = [] }) => {
         customerId: '',
         items: [],
         totalAmount: '',
-        status: 'PENDING'
+        status: 'PENDING',
+        notes: '',
+        deliveryDate: ''
     });
 
     const handleSubmit = (e) => {
         e.preventDefault();
         onSubmit({
             ...formData,
-            totalAmount: parseFloat(formData.totalAmount)
+            totalAmount: parseFloat(formData.totalAmount),
+            deliveryDate: formData.deliveryDate || null,
+            notes: formData.notes || null
         });
     };
 
@@ -53,6 +56,14 @@ const OrderForm = ({ onSubmit, onCancel, customers = [] }) => {
                         required
                         className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                     />
+                    <input
+                        type="date"
+                        name="deliveryDate"
+                        placeholder="Delivery Date"
+                        value={formData.deliveryDate}
+                        onChange={handleChange}
+                        className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    />
                     <select
                         name="status"
                         value={formData.status}
@@ -60,10 +71,21 @@ const OrderForm = ({ onSubmit, onCancel, customers = [] }) => {
                         className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                     >
                         <option value="PENDING">Pending</option>
-                        <option value="COMPLETED">Completed</option>
+                        <option value="CONFIRMED">Confirmed</option>
+                        <option value="PROCESSING">Processing</option>
+                        <option value="SHIPPED">Shipped</option>
+                        <option value="DELIVERED">Delivered</option>
                         <option value="CANCELLED">Cancelled</option>
                     </select>
                 </div>
+                <textarea
+                    name="notes"
+                    placeholder="Order Notes"
+                    value={formData.notes}
+                    onChange={handleChange}
+                    rows="3"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
                 <div className="flex gap-3">
                     <button
                         type="submit"
