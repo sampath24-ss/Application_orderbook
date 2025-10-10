@@ -6,55 +6,77 @@ import ItemForm from '../components/items/ItemForm';
 import ItemTable from '../components/items/ItemTable';
 
 const ItemsPage = ({ setCurrentPage }) => {
-    const { items, loading, createItem, updateItem, updateItemQuantity, deleteItem } = useItems();
-    const { customers, fetchCustomers } = useCustomers();
+    const { items, loading: itemsLoading, fetchItems, createItem, updateItem, updateItemQuantity, deleteItem } = useItems();
+    const { customers, loading: customersLoading, fetchCustomers } = useCustomers();
     const [showForm, setShowForm] = useState(false);
     const [editingItem, setEditingItem] = useState(null);
     const [refreshing, setRefreshing] = useState(false);
 
-    // Auto-refresh customers when page loads
+    // Fetch customers AND items when page loads
     useEffect(() => {
-        fetchCustomers();
+        const loadData = async () => {
+            await fetchCustomers();
+            await fetchItems();
+        };
+        loadData();
     }, []);
-    console.log('📦 Items:', items);
-    console.log('👥 Customers:', customers);
+
+    // Debug logging
+    useEffect(() => {
+        console.log('📦 Items loaded:', items.length);
+        console.log('👥 Customers loaded:', customers.length);
+        if (items.length > 0) {
+            console.log('First item customerId:', items[0].customerId);
+        }
+        if (customers.length > 0) {
+            console.log('First customer id:', customers[0].id);
+        }
+    }, [items, customers]);
 
     const handleRefresh = async () => {
         setRefreshing(true);
-        await fetchCustomers();
+        await Promise.all([fetchCustomers(), fetchItems()]);
         setTimeout(() => setRefreshing(false), 500);
     };
 
     const handleSubmit = async (formData) => {
         console.log('📤 Submitting item with data:', formData);
         
+        let result;
         if (editingItem) {
-            const result = await updateItem(editingItem.id, formData);
-            if (result.success) {
-                setShowForm(false);
-                setEditingItem(null);
-            }
+            result = await updateItem(editingItem.id, formData);
         } else {
-            const result = await createItem(formData);
-            if (result.success) {
-                setShowForm(false);
-            }
+            result = await createItem(formData);
+        }
+        
+        if (result.success) {
+            setShowForm(false);
+            setEditingItem(null);
+            // Refresh data after successful operation
+            await Promise.all([fetchCustomers(), fetchItems()]);
         }
     };
 
     const handleEdit = (item) => {
+        console.log('Editing item:', item);
         setEditingItem(item);
         setShowForm(true);
     };
 
     const handleDelete = async (id) => {
         if (window.confirm('Are you sure you want to delete this item?')) {
-            await deleteItem(id);
+            const result = await deleteItem(id);
+            if (result.success) {
+                await fetchItems();
+            }
         }
     };
 
     const handleQuantityUpdate = async (id, newQuantity) => {
-        await updateItemQuantity(id, parseInt(newQuantity));
+        const result = await updateItemQuantity(id, parseInt(newQuantity));
+        if (result.success) {
+            await fetchItems();
+        }
     };
 
     const handleCancel = () => {
@@ -67,12 +89,15 @@ const ItemsPage = ({ setCurrentPage }) => {
             // Refresh customers first
             await fetchCustomers();
             if (customers.length === 0) {
-                return; // Still no customers
+                alert('Please create a customer first before adding items.');
+                return;
             }
         }
         setShowForm(!showForm);
         setEditingItem(null);
     };
+
+    const loading = itemsLoading || customersLoading;
 
     return (
         <div className="p-6">
@@ -84,19 +109,18 @@ const ItemsPage = ({ setCurrentPage }) => {
                         ({customers.length} customer{customers.length !== 1 ? 's' : ''} available)
                     </span>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-3">
                     <button
                         onClick={handleRefresh}
                         disabled={refreshing}
-                        className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition flex items-center gap-2"
-                        title="Refresh customers list"
+                        className="flex items-center gap-2 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition disabled:opacity-50"
                     >
-                        <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
+                        <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
                         Refresh
                     </button>
                     <button
                         onClick={handleAddItemClick}
-                        className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition flex items-center gap-2"
+                        className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition"
                     >
                         <Plus className="w-5 h-5" />
                         Add Item
@@ -104,31 +128,20 @@ const ItemsPage = ({ setCurrentPage }) => {
                 </div>
             </div>
 
-            {/* Warning if no customers */}
-            {customers.length === 0 && !showForm && (
-                <div className="flex items-start gap-3 p-4 bg-yellow-50 border border-yellow-200 rounded-lg mb-6">
-                    <AlertCircle className="w-6 h-6 text-yellow-600 flex-shrink-0 mt-0.5" />
-                    <div className="flex-1">
-                        <h3 className="font-semibold text-yellow-900 mb-1">No Customers Available</h3>
-                        <p className="text-yellow-800 text-sm mb-3">
-                            You need to create at least one customer before you can create items. Items must be assigned to a customer.
-                        </p>
-                        <div className="flex gap-2">
-                            {setCurrentPage && (
-                                <button
-                                    onClick={() => setCurrentPage('customers')}
-                                    className="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition text-sm"
-                                >
-                                    Go to Customers Page
-                                </button>
-                            )}
-                            <button
-                                onClick={handleRefresh}
-                                className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition text-sm"
+            {customers.length === 0 && !loading && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                        <p className="text-yellow-800 font-medium">No customers found</p>
+                        <p className="text-yellow-700 text-sm mt-1">
+                            You need to create customers before you can add items. 
+                            <button 
+                                onClick={() => setCurrentPage('customers')}
+                                className="ml-1 underline hover:text-yellow-900"
                             >
-                                Refresh Customer List
+                                Go to Customers
                             </button>
-                        </div>
+                        </p>
                     </div>
                 </div>
             )}
@@ -153,7 +166,5 @@ const ItemsPage = ({ setCurrentPage }) => {
         </div>
     );
 };
-
-
 
 export default ItemsPage;

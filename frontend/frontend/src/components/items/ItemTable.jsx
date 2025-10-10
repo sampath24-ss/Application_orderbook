@@ -3,10 +3,24 @@ import { Edit2, Trash2, DollarSign, Package } from 'lucide-react';
 
 const ItemTable = ({ items, customers, onEdit, onDelete, onQuantityUpdate, loading }) => {
     const getCustomerName = (customerId) => {
-        console.log('Looking for customer:', customerId, 'in', customers);
+        // Add defensive check
+        if (!customerId) {
+            console.warn('Item has no customerId');
+            return 'Unknown';
+        }
+        
+        if (!Array.isArray(customers) || customers.length === 0) {
+            console.warn('No customers available yet');
+            return 'Loading...';
+        }
+        
         const customer = customers.find(c => c.id === customerId);
-        console.log('Found customer:', customer);
-        return customer ? customer.name : 'Unknown';
+        if (!customer) {
+            console.warn('Customer not found for ID:', customerId);
+            return 'Unknown';
+        }
+        
+        return customer.name;
     };
 
     if (loading) {
@@ -57,27 +71,25 @@ const ItemTable = ({ items, customers, onEdit, onDelete, onQuantityUpdate, loadi
                             <tr key={item.id} className="hover:bg-gray-50 transition">
                                 <td className="px-6 py-4">
                                     <div className="flex items-start gap-3">
-                                        <Package className="w-5 h-5 text-green-600 mt-1" />
+                                        <div className="p-2 bg-green-100 rounded">
+                                            <Package className="w-5 h-5 text-green-600" />
+                                        </div>
                                         <div>
-                                            <div className="text-sm font-medium text-gray-900">{item.name}</div>
-                                            {item.description && (
-                                                <div className="text-sm text-gray-500 max-w-xs truncate">
-                                                    {item.description}
-                                                </div>
-                                            )}
+                                            <div className="font-medium text-gray-900">{item.name}</div>
+                                            <div className="text-sm text-gray-500">{item.description}</div>
                                         </div>
                                     </div>
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                    <div className="text-sm text-gray-900">{getCustomerName(item.customerId)}</div>
+                                <td className="px-6 py-4 text-sm text-gray-700">
+                                    {getCustomerName(item.customerId)}
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                    <div className="flex items-center gap-1 text-sm text-gray-900">
+                                <td className="px-6 py-4">
+                                    <div className="flex items-center gap-1 text-sm font-medium text-gray-900">
                                         <DollarSign className="w-4 h-4" />
-                                        <td className="py-3 px-4">${parseFloat(item.price || 0).toFixed(2)}</td>
+                                        {Number(item.price).toFixed(2)}
                                     </div>
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
+                                <td className="px-6 py-4">
                                     <input
                                         type="number"
                                         min="0"
@@ -86,28 +98,26 @@ const ItemTable = ({ items, customers, onEdit, onDelete, onQuantityUpdate, loadi
                                         className="w-20 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-green-500"
                                     />
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                    {item.category && (
-                                        <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full">
-                                            {item.category}
-                                        </span>
-                                    )}
+                                <td className="px-6 py-4 text-sm">
+                                    <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
+                                        {item.category}
+                                    </span>
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                    <div className="flex justify-end gap-2">
+                                <td className="px-6 py-4 text-right">
+                                    <div className="flex items-center justify-end gap-2">
                                         <button
                                             onClick={() => onEdit(item)}
-                                            className="text-green-600 hover:text-green-900 p-2 rounded-lg hover:bg-green-50 transition"
-                                            title="Edit"
+                                            className="p-2 text-blue-600 hover:bg-blue-50 rounded transition"
+                                            title="Edit item"
                                         >
-                                            <Edit2 className="w-5 h-5" />
+                                            <Edit2 className="w-4 h-4" />
                                         </button>
                                         <button
                                             onClick={() => onDelete(item.id)}
-                                            className="text-red-600 hover:text-red-900 p-2 rounded-lg hover:bg-red-50 transition"
-                                            title="Delete"
+                                            className="p-2 text-red-600 hover:bg-red-50 rounded transition"
+                                            title="Delete item"
                                         >
-                                            <Trash2 className="w-5 h-5" />
+                                            <Trash2 className="w-4 h-4" />
                                         </button>
                                     </div>
                                 </td>
