@@ -346,7 +346,7 @@ export class OrderService {
             logger.error('Error updating order:', error);
             throw error;
         }
-    }
+    } 
 
     public async cancelOrder(id: string, reason: string | null = null): Promise<Order | null> {
         try {

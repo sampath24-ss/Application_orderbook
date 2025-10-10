@@ -21,14 +21,18 @@ const ItemForm = ({ onSubmit, onCancel, initialData = null, customers = [] }) =>
     }, [initialData]);
 
     const handleSubmit = (e) => {
-        e.preventDefault();
-        onSubmit({
-            ...formData,
-            price: parseFloat(formData.price),
-            quantity: parseInt(formData.quantity)
-        });
+    e.preventDefault();
+    
+    const submitData = {
+        name: formData.name,
+        description: formData.description,
+        price: parseFloat(formData.price),
+        quantity: parseInt(formData.quantity),
+        category: formData.category
     };
-
+    
+    onSubmit(submitData);
+};
     const handleChange = (e) => {
         setFormData({
             ...formData,

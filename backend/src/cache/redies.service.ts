@@ -17,7 +17,6 @@ export class RedisService {
             lazyConnect: true,
         };
 
-        // Only add password if it exists
         if (process.env.REDIS_PASSWORD) {
             redisConfig.password = process.env.REDIS_PASSWORD;
         }
@@ -51,14 +50,13 @@ export class RedisService {
     }
 
     public async connect(): Promise<void> {
-    // If already connected or connecting, do nothing
     if (this.connected || (this.redis && (this.redis.status === 'ready' || this.redis.status === 'connecting'))) {
         logger.info('Redis already connected or connecting');
         return;
     }
 
     try {
-        await this.redis.connect(); // use the existing Redis instance
+        await this.redis.connect();
         this.connected = true;
         logger.info('Redis connection ready');
     } catch (error) {

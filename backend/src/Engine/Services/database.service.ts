@@ -690,7 +690,7 @@ export class DatabaseService {
     }
 
     public async getCustomerItems(
-        customerId: string,
+        customerId: string, 
         page: number = 1,
         limit: number = 10,
         category?: string,

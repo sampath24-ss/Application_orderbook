@@ -57,7 +57,7 @@ class ApiService {
 
     // Customer endpoints
     customers = {
-        getAll: () => this.get('/customers'),
+        getAll: () => this.get('/customers?limit=1000'),
         getById: (id) => this.get(`/customers/${id}`),
         create: (data) => this.post('/customers', data),
         update: (id, data) => this.put(`/customers/${id}`, data),

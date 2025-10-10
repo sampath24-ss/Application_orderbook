@@ -282,6 +282,7 @@ export class itemController {
             const cacheKey = itemController.getItemsListCacheKey(page, limit, category, search, customerId);
             result = await itemController.redisService.get<{ items: CustomerItem[]; total: number }>(cacheKey);
 
+            
             if (result) {
                 cacheHit = true;
                 logger.debug(`Cache HIT for all items list`, {
@@ -297,7 +298,7 @@ export class itemController {
                     data: {
                         items: result.items,
                         total: result.total,
-                        page,
+                        page, 
                         limit,
                         totalPages: Math.ceil(result.total / limit),
                         filters: { category, search, customerId }
@@ -506,7 +507,7 @@ export class itemController {
                         source: 'database'
                     }
                 });
-            } else {
+            } else { 
                 // Fallback to original Kafka flow
                 await kafkaService.publishCustomerItemEvent(
                     'ITEM_REQUESTED',
