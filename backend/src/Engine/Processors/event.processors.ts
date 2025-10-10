@@ -176,6 +176,7 @@ export class EventProcessor {
             let success = false;
 
             switch (eventType) {
+                case 'ITEM_CREATED':
                 case 'ITEM_CREATE_REQUESTED':
                     responseData = await this.itemService.createCustomerItem(data);
                     success = true;
@@ -188,7 +189,7 @@ export class EventProcessor {
                         await this.redisService.deletePattern('items:list:*');
                     }
                     break;
-
+                case 'ITEM_UPDATED': 
                 case 'ITEM_UPDATE_REQUESTED':
                     responseData = await this.itemService.updateCustomerItem(data.id, data);
                     success = true;
@@ -199,7 +200,15 @@ export class EventProcessor {
                         await this.redisService.deletePattern(`items:customer:${responseData.customerId}*`);
                     }
                     break;
-
+                case 'ITEM_REQUESTED':
+                    responseData = await this.itemService.getCustomerItemById(data.id);
+                    success = true;
+    
+                    if (responseData) {
+                        await this.redisService.cacheCustomerItem(responseData);
+                    }
+                    break;
+                case 'ITEM_DELETED':
                 case 'ITEM_DELETE_REQUESTED':
                     // Get item first to know which customer cache to invalidate
                     const existingItem = await this.redisService.getCachedCustomerItem(data.id);

@@ -123,89 +123,102 @@ export class ItemService {
     }
 
     public async getAllItems(
-    page: number = 1,
-    limit: number = 10,
-    category?: string,
-    search?: string,
-    customerId?: string
-): Promise<{ items: CustomerItem[]; total: number; page: number; limit: number; totalPages: number }> {
-    try {
-        if (page < 1) page = 1;
-        if (limit < 1 || limit > 100) limit = 10;
+        page: number = 1,
+        limit: number = 10,
+        category?: string,
+        search?: string,
+        customerId?: string
+    ): Promise<{ items: CustomerItem[]; total: number; page: number; limit: number; totalPages: number }> {
+        try {
+            if (page < 1) page = 1;
+            if (limit < 1 || limit > 100) limit = 10;
 
-        let query = 'SELECT * FROM customer_items';
-        let countQuery = 'SELECT COUNT(*) FROM customer_items';
-        const params: any[] = [];
-        const conditions: string[] = [];
+            let query = 'SELECT * FROM customer_items';
+            let countQuery = 'SELECT COUNT(*) FROM customer_items';
+            const params: any[] = [];
+            const conditions: string[] = [];
 
-        if (customerId) {
-            if (!this.isValidUuid(customerId)) {
-                throw new Error('Invalid customer ID format');
+            if (customerId) {
+                if (!this.isValidUuid(customerId)) {
+                    throw new Error('Invalid customer ID format');
+                }
+                conditions.push(`customer_id = $${params.length + 1}`);
+                params.push(customerId);
             }
-            conditions.push(`customer_id = $${params.length + 1}`);
-            params.push(customerId);
+
+            if (category) {
+                conditions.push(`category = $${params.length + 1}`);
+                params.push(category);
+            }
+
+            if (search) {
+                conditions.push(`name ILIKE $${params.length + 1}`);
+                params.push(`%${search}%`);
+            }
+
+            if (conditions.length > 0) {
+                const whereClause = ' WHERE ' + conditions.join(' AND ');
+                query += whereClause;
+                countQuery += whereClause;
+            }
+
+            query += ` ORDER BY created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+            const offset = (page - 1) * limit;
+            const queryParams = [...params, limit, offset];
+
+            const results = await Promise.all([
+                this.databaseService.executeQuery<any>(query, queryParams),
+                this.databaseService.executeQuery<{ count: string }>(countQuery, params)
+            ]);
+
+            const itemsResult = results[0];
+            const countResult = results[1];
+
+            // Fix: Add comprehensive null checks
+            const itemRows = itemsResult?.rows || [];
+            const countRows = countResult?.rows || [];
+
+            // Safe access to count with fallback
+            const total = countRows.length > 0 && countRows[0]?.count
+                ? parseInt(countRows[0].count)
+                : 0;
+
+            const totalPages = Math.ceil(total / limit);
+
+            logger.info(`Retrieved all items:`, {
+                page,
+                limit,
+                total,
+                totalPages,
+                filters: { customerId, category, search }
+            });
+
+            return {
+                items: itemRows.map(row => ({
+                    id: row.id,
+                    customerId: row.customer_id,
+                    name: row.name,
+                    description: row.description,
+                    price: parseFloat(row.price),
+                    quantity: row.quantity,
+                    category: row.category,
+                    status: row.status,
+                    minStockLevel: row.min_stock_level,
+                    createdAt: new Date(row.created_at),
+                    updatedAt: new Date(row.updated_at),
+                    tenantId: row.tenant_id
+                })),
+                total,
+                page,
+                limit,
+                totalPages
+            };
+
+        } catch (error) {
+            logger.error('Error getting all items:', error);
+            throw error;
         }
-
-        if (category) {
-            conditions.push(`category = $${params.length + 1}`);
-            params.push(category);
-        }
-
-        if (search) {
-            conditions.push(`name ILIKE $${params.length + 1}`);
-            params.push(`%${search}%`);
-        }
-
-        if (conditions.length > 0) {
-            const whereClause = ' WHERE ' + conditions.join(' AND ');
-            query += whereClause;
-            countQuery += whereClause;
-        }
-
-        query += ` ORDER BY created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
-        const offset = (page - 1) * limit;
-        const queryParams = [...params, limit, offset];
-
-        const results = await Promise.all([
-            this.databaseService.executeQuery<CustomerItem>(query, queryParams),
-            this.databaseService.executeQuery<{ count: string }>(countQuery, params)
-        ]);
-
-        const itemsResult = results[0];
-        const countResult = results[1];
-
-        // Fix: Add comprehensive null checks
-        const itemRows = itemsResult?.rows || [];
-        const countRows = countResult?.rows || [];
-        
-        // Safe access to count with fallback
-        const total = countRows.length > 0 && countRows[0]?.count
-            ? parseInt(countRows[0].count)
-            : 0;
-        
-        const totalPages = Math.ceil(total / limit);
-
-        logger.info(`Retrieved all items:`, {
-            page,
-            limit,
-            total,
-            totalPages,
-            filters: { customerId, category, search }
-        });
-
-        return {
-            items: itemRows,
-            total,
-            page,
-            limit,
-            totalPages
-        };
-
-    } catch (error) {
-        logger.error('Error getting all items:', error);
-        throw error;
     }
-}
 
     public async updateCustomerItem(id: string, updates: UpdateCustomerItemRequest): Promise<CustomerItem | null> {
         try {

@@ -1,4 +1,4 @@
-// src/controllers/customer.controller.ts - Updated with Cache-First Pattern
+// src/controllers/customer.controller.ts
 import { Request, Response } from 'express';
 import { KafkaService } from '../kafka';
 import { RedisService } from '../cache/redies.service';

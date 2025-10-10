@@ -11,10 +11,23 @@ export const useItems = () => {
         setError(null);
         try {
             const response = await api.items.getAll();
-            setItems(response.data || []);
+            let itemsData = [];
+        if (Array.isArray(response)) {
+            itemsData = response;
+        } else if (response.data && Array.isArray(response.data)) {
+            itemsData = response.data;
+        } else if (response.data && response.data.items && Array.isArray(response.data.items)) {
+            itemsData = response.data.items;
+        } else if (response.items && Array.isArray(response.items)) {
+            itemsData = response.items;
+        }
+            
+            console.log('📦 First Item:', itemsData[0]);
+            setItems(itemsData);
         } catch (err) {
             setError(err.message);
             console.error('Error fetching items:', err);
+            setItems([]); // Set empty array on error
         } finally {
             setLoading(false);
         }
@@ -41,7 +54,7 @@ export const useItems = () => {
             return { success: false, error: err.message };
         }
     };
-
+    
     const updateItemQuantity = async (id, quantity) => {
         try {
             await api.items.updateQuantity(id, quantity);

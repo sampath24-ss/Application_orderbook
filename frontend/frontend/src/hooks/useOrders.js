@@ -7,18 +7,32 @@ export const useOrders = () => {
     const [error, setError] = useState(null);
 
     const fetchOrders = async () => {
-        setLoading(true);
-        setError(null);
-        try {
-            const response = await api.orders.getAll();
-            setOrders(response.data || []);
-        } catch (err) {
-            setError(err.message);
-            console.error('Error fetching orders:', err);
-        } finally {
-            setLoading(false);
+    setLoading(true);
+    setError(null);
+    try {
+        const response = await api.orders.getAll();
+        
+        let ordersData = [];
+        if (Array.isArray(response)) {
+            ordersData = response;
+        } else if (response.data && Array.isArray(response.data)) {
+            ordersData = response.data;
+        } else if (response.data && response.data.orders && Array.isArray(response.data.orders)) {
+            ordersData = response.data.orders;
+        } else if (response.orders && Array.isArray(response.orders)) {
+            ordersData = response.orders;
         }
-    };
+        
+        console.log('Orders Data:', ordersData);
+        setOrders(ordersData);
+    } catch (err) {
+        setError(err.message);
+        console.error('Error fetching orders:', err);
+        setOrders([]);
+    } finally {
+        setLoading(false);
+    }
+};
 
     const createOrder = async (data) => {
         try {

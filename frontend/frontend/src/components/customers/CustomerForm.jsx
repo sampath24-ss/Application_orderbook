@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const CustomerForm = ({ onSubmit, onCancel, initialData = null }) => {
+const CustomerForm = ({ onSubmit, onCancel, initialData = null, disabled = false }) => {
     const [formData, setFormData] = useState({
         name: '',
         email: '',
@@ -42,7 +42,8 @@ const CustomerForm = ({ onSubmit, onCancel, initialData = null }) => {
                         value={formData.name}
                         onChange={handleChange}
                         required
-                        className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        disabled={disabled}
+                        className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                     <input
                         type="email"
@@ -51,7 +52,8 @@ const CustomerForm = ({ onSubmit, onCancel, initialData = null }) => {
                         value={formData.email}
                         onChange={handleChange}
                         required
-                        className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        disabled={disabled}
+                        className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                     <input
                         type="tel"
@@ -59,7 +61,8 @@ const CustomerForm = ({ onSubmit, onCancel, initialData = null }) => {
                         placeholder="Phone"
                         value={formData.phone}
                         onChange={handleChange}
-                        className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        disabled={disabled}
+                        className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                     <input
                         type="text"
@@ -67,7 +70,8 @@ const CustomerForm = ({ onSubmit, onCancel, initialData = null }) => {
                         placeholder="City"
                         value={formData.city}
                         onChange={handleChange}
-                        className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        disabled={disabled}
+                        className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                     <input
                         type="text"
@@ -75,7 +79,8 @@ const CustomerForm = ({ onSubmit, onCancel, initialData = null }) => {
                         placeholder="Country"
                         value={formData.country}
                         onChange={handleChange}
-                        className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        disabled={disabled}
+                        className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                 </div>
                 <textarea
@@ -84,19 +89,22 @@ const CustomerForm = ({ onSubmit, onCancel, initialData = null }) => {
                     value={formData.address}
                     onChange={handleChange}
                     rows="3"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={disabled}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 />
                 <div className="flex gap-3">
                     <button
                         type="submit"
-                        className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition"
+                        disabled={disabled}
+                        className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        {initialData ? 'Update Customer' : 'Create Customer'}
+                        {disabled ? 'Processing...' : (initialData ? 'Update Customer' : 'Create Customer')}
                     </button>
                     <button
                         type="button"
                         onClick={onCancel}
-                        className="bg-gray-300 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-400 transition"
+                        disabled={disabled}
+                        className="bg-gray-300 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-400 transition disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         Cancel
                     </button>

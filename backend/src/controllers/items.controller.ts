@@ -394,8 +394,6 @@ export class itemController {
             }
         } catch (error) {
             logger.error('Error in getAllItems:', error);
-
-            // Fallback to original Kafka flow on error
             try {
                 const requestId = uuidv4();
 
