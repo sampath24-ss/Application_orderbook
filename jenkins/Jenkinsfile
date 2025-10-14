@@ -36,7 +36,7 @@ pipeline {
     environment {
         SONAR_SCANNER_HOME = tool 'mysonar'
         SONAR_TOKEN = credentials('sonar-token')
-        DEPENDENCY_CHECK_HOME = tool 'DP-check'
+        DEPENDENCY_CHECK_HOME = tool 'DP-Check'
         
         BUILD_TIMESTAMP = "${new Date().format('yyyyMMdd-HHmmss')}"
         BUILD_VERSION = "${params.BRANCH_NAME}-${BUILD_NUMBER}-${BUILD_TIMESTAMP}"
