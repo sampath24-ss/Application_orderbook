@@ -97,13 +97,20 @@ pipeline {
         stage('Install Dependencies') {
             steps {
                 dir(PROJECT_DIR) {
-                    sh '''
-                        echo "Installing dependencies..."
-                        npm ci
-                    '''
-                }
-            }
+            sh '''
+                echo "Installing dependencies..."
+                if [ -f package-lock.json ]; then
+                    echo "Found package-lock.json — running npm ci"
+                    npm ci
+                else
+                    echo "No package-lock.json found — running npm install instead"
+                    npm install
+                fi
+            '''
         }
+    }
+}
+
         
         stage('Code Quality - Linting') {
             steps {
