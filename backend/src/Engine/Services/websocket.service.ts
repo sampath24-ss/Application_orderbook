@@ -17,11 +17,12 @@ export class WebSocketService {
     private constructor() {
         this.kafkaService = KafkaService.getInstance();
     }
-
+    
     public static getInstance(): WebSocketService {
         if (!WebSocketService.instance) {
             WebSocketService.instance = new WebSocketService();
         }
+        console.log('testing');
         return WebSocketService.instance;
     }
 
