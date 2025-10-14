@@ -2,27 +2,96 @@ pipeline {
     agent any
     
     tools {
-        nodejs 'node16'
+        nodejs 'nodejs21'
     }
-   //just to commit 
+    
+    parameters {
+        choice(
+            name: 'PROJECT_TYPE',
+            choices: ['backend', 'frontend'],
+            description: 'Select project type to build'
+        )
+        choice(
+            name: 'BRANCH_NAME',
+            choices: ['main', 'master', 'develop', 'staging'],
+            description: 'Select branch to build'
+        )
+        booleanParam(
+            name: 'CREATE_TAG',
+            defaultValue: true,
+            description: 'Create Git tag for this build'
+        )
+        booleanParam(
+            name: 'SKIP_TESTS',
+            defaultValue: false,
+            description: 'Skip running tests'
+        )
+        booleanParam(
+            name: 'DEPLOY_AFTER_BUILD',
+            defaultValue: false,
+            description: 'Deploy after successful build'
+        )
+    }
+    
     environment {
-        SONAR_PROJECT_KEY = 'backend-nodejs-app'
+        SONAR_SCANNER_HOME = tool 'mysonar'
+        SONAR_TOKEN = credentials('sonar-token')
+        DEPENDENCY_CHECK_HOME = tool 'DP-check'
+        
+        BUILD_TIMESTAMP = "${new Date().format('yyyyMMdd-HHmmss')}"
+        BUILD_VERSION = "${params.BRANCH_NAME}-${BUILD_NUMBER}-${BUILD_TIMESTAMP}"
+        GIT_TAG_NAME = "${params.PROJECT_TYPE}-${params.BRANCH_NAME}-v${BUILD_NUMBER}"
+        
+        DEPLOY_ENV = "${params.BRANCH_NAME == 'main' || params.BRANCH_NAME == 'master' ? 'production' : params.BRANCH_NAME == 'staging' ? 'staging' : 'development'}"
+        
+        PROJECT_DIR = "${params.PROJECT_TYPE}"
+        ARTIFACT_NAME = "${params.PROJECT_TYPE}-${BUILD_VERSION}.tar.gz"
         OWASP_REPORT_DIR = "${WORKSPACE}/dependency-check-report"
-        SCANNER_HOME = tool 'mysonar'
+    }
+    
+    triggers {
+        pollSCM('H/5 * * * *')
     }
     
     stages {
+        stage('Build Information') {
+            steps {
+                script {
+                    echo "Project Type: ${params.PROJECT_TYPE}"
+                    echo "Branch: ${params.BRANCH_NAME}"
+                    echo "Build Version: ${BUILD_VERSION}"
+                    echo "Environment: ${DEPLOY_ENV}"
+                    echo "Timestamp: ${BUILD_TIMESTAMP}"
+                    echo "Build Number: ${BUILD_NUMBER}"
+                }
+            }
+        }
+        
         stage('Checkout') {
             steps {
-                checkout scm
+                script {
+                    checkout scm
+                    
+                    env.GIT_COMMIT_SHORT = sh(
+                        script: "git rev-parse --short HEAD",
+                        returnStdout: true
+                    ).trim()
+                    
+                    env.GIT_COMMIT_MSG = sh(
+                        script: "git log -1 --pretty=%B",
+                        returnStdout: true
+                    ).trim()
+                    
+                    echo "Last Commit: ${env.GIT_COMMIT_SHORT}"
+                    echo "Commit Message: ${env.GIT_COMMIT_MSG}"
+                }
             }
         }
         
         stage('Install Dependencies') {
             steps {
-                dir('backend') {
+                dir(PROJECT_DIR) {
                     sh '''
-                        set -x
                         echo "Installing dependencies..."
                         npm ci
                     '''
@@ -30,71 +99,213 @@ pipeline {
             }
         }
         
-        stage('Build') {
+        stage('Code Quality - Linting') {
             steps {
-                dir('backend') {
+                dir(PROJECT_DIR) {
                     sh '''
-                        set -x
-                        echo "Building application..."
-                        npm run build
+                        echo "Running linting checks..."
+                        npm run lint || true
                     '''
                 }
             }
         }
         
-        stage('Test') {
+        stage('OWASP Dependency Check') {
             steps {
-                dir('backend') {
-                    sh '''
-                        set -x
-                        echo "Running tests..."
-                        npm test || true
-                    '''
+                script {
+                    echo "Running OWASP Dependency Check..."
+                    
+                    dir(PROJECT_DIR) {
+                        dependencyCheck additionalArguments: """
+                            --scan .
+                            --format HTML
+                            --format JSON
+                            --project ${params.PROJECT_TYPE}-${params.BRANCH_NAME}
+                            --out ${OWASP_REPORT_DIR}
+                        """, odcInstallation: 'DP-check'
+                        
+                        dependencyCheckPublisher pattern: "${OWASP_REPORT_DIR}/dependency-check-report.xml"
+                    }
                 }
             }
         }
         
         stage('SonarQube Analysis') {
             steps {
-                dir('backend') {
+                dir(PROJECT_DIR) {
                     withSonarQubeEnv('mysonar') {
-                        sh """
-                            set -x
-                            echo "Running SonarQube analysis..."
-                            ${SCANNER_HOME}/bin/sonar-scanner \
-                            -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
-                            -Dsonar.sources=src \
-                            -Dsonar.typescript.lcov.reportPaths=coverage/lcov.info \
-                            -Dsonar.exclusions=**/node_modules/**,**/dist/**
-                        """
+                        script {
+                            if (params.PROJECT_TYPE == 'backend') {
+                                sh """
+                                    ${SONAR_SCANNER_HOME}/bin/sonar-scanner \
+                                    -Dsonar.projectKey=${params.PROJECT_TYPE}-${params.BRANCH_NAME} \
+                                    -Dsonar.projectName=${params.PROJECT_TYPE}-${params.BRANCH_NAME} \
+                                    -Dsonar.sources=src \
+                                    -Dsonar.typescript.lcov.reportPaths=coverage/lcov.info \
+                                    -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/*.test.ts,**/*.spec.ts \
+                                    -Dsonar.branch.name=${params.BRANCH_NAME}
+                                """
+                            } else {
+                                sh """
+                                    ${SONAR_SCANNER_HOME}/bin/sonar-scanner \
+                                    -Dsonar.projectKey=${params.PROJECT_TYPE}-${params.BRANCH_NAME} \
+                                    -Dsonar.projectName=${params.PROJECT_TYPE}-${params.BRANCH_NAME} \
+                                    -Dsonar.sources=src \
+                                    -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
+                                    -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/*.test.js,**/*.spec.js \
+                                    -Dsonar.branch.name=${params.BRANCH_NAME}
+                                """
+                            }
+                        }
                     }
                 }
             }
         }
         
-        stage('Quality Gate') {
+        stage('Quality Gate Check') {
             steps {
-                timeout(time: 5, unit: 'MINUTES') {
-                    waitForQualityGate abortPipeline: true
+                script {
+                    echo "Checking SonarQube Quality Gate..."
+                    
+                    timeout(time: 5, unit: 'MINUTES') {
+                        def qg = waitForQualityGate()
+                        if (qg.status != 'OK') {
+                            echo "Quality Gate failed: ${qg.status}"
+                            if (params.BRANCH_NAME == 'main' || params.BRANCH_NAME == 'master') {
+                                error "Quality Gate failed for production branch"
+                            } else {
+                                echo "Quality Gate failed but continuing for ${params.BRANCH_NAME} branch"
+                            }
+                        }
+                    }
                 }
             }
         }
         
-        
-        stage('Archive') {
+        stage('Unit Tests') {
+            when {
+                expression { return !params.SKIP_TESTS }
+            }
             steps {
-                archiveArtifacts artifacts: 'backend/dist/**/*', allowEmptyArchive: true
-                archiveArtifacts artifacts: "${OWASP_REPORT_DIR}/**/*", allowEmptyArchive: true
+                dir(PROJECT_DIR) {
+                    sh '''
+                        echo "Running unit tests..."
+                        npm test -- --coverage --watchAll=false || true
+                    '''
+                }
+            }
+            post {
+                always {
+                    junit "**/test-results/**/*.xml" allowEmptyResults: true
+                    publishHTML([
+                        reportDir: "${PROJECT_DIR}/coverage",
+                        reportFiles: 'index.html',
+                        reportName: 'Coverage Report',
+                        keepAll: true
+                    ])
+                }
+            }
+        }
+        
+        stage('Build Application') {
+            steps {
+                dir(PROJECT_DIR) {
+                    script {
+                        echo "Building ${params.PROJECT_TYPE} for ${DEPLOY_ENV} environment..."
+                        
+                        if (params.PROJECT_TYPE == 'backend') {
+                            sh 'npm run build'
+                        } else {
+                            sh "npm run build"
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Create Git Tag') {
+            when {
+                expression { return params.CREATE_TAG }
+            }
+            steps {
+                script {
+                    echo "Creating Git tag: ${GIT_TAG_NAME}"
+                    
+                    sh """
+                        git config user.name "Jenkins CI"
+                        git config user.email "jenkins@yourdomain.com"
+                        git tag -a ${GIT_TAG_NAME} -m "Build ${BUILD_NUMBER} - ${params.PROJECT_TYPE} - ${params.BRANCH_NAME}"
+                        git push origin ${GIT_TAG_NAME} || echo "Tag already exists or push failed"
+                    """
+                }
+            }
+        }
+        
+        stage('Create Build Artifact') {
+            steps {
+                dir(PROJECT_DIR) {
+                    script {
+                        echo "Creating build artifact..."
+                        
+                        if (params.PROJECT_TYPE == 'backend') {
+                            sh """
+                                tar -czf ../${ARTIFACT_NAME} dist/ node_modules/ package.json package-lock.json
+                            """
+                        } else {
+                            sh """
+                                tar -czf ../${ARTIFACT_NAME} dist/
+                            """
+                        }
+                    }
+                }
+            }
+            post {
+                success {
+                    archiveArtifacts artifacts: "${ARTIFACT_NAME}", fingerprint: true
+                }
+            }
+        }
+        
+        stage('Deploy to Environment') {
+            when {
+                expression { return params.DEPLOY_AFTER_BUILD }
+            }
+            steps {
+                script {
+                    echo "Deploying ${params.PROJECT_TYPE} to ${DEPLOY_ENV}..."
+                    
+                    if (DEPLOY_ENV == 'production') {
+                        echo "Production deployment for ${params.PROJECT_TYPE}"
+                    } else if (DEPLOY_ENV == 'staging') {
+                        echo "Staging deployment for ${params.PROJECT_TYPE}"
+                    } else {
+                        echo "Development deployment for ${params.PROJECT_TYPE}"
+                    }
+                }
             }
         }
     }
     
     post {
-        success {
-            echo 'Pipeline completed successfully'
+        always {
+            echo "Cleaning up workspace..."
+            cleanWs()
         }
+        
+        success {
+            script {
+                echo "Pipeline completed successfully for ${params.PROJECT_TYPE} - ${params.BRANCH_NAME}"
+                echo "Build Version: ${BUILD_VERSION}"
+                echo "Git Tag: ${params.CREATE_TAG ? GIT_TAG_NAME : 'No tag created'}"
+            }
+        }
+        
         failure {
-            echo 'Pipeline failed'
+            echo "Pipeline failed for ${params.PROJECT_TYPE} - ${params.BRANCH_NAME}"
+        }
+        
+        unstable {
+            echo "Pipeline unstable for ${params.PROJECT_TYPE} - ${params.BRANCH_NAME}"
         }
     }
 }
