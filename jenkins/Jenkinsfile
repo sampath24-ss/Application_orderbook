@@ -122,7 +122,7 @@ pipeline {
                             --format JSON
                             --project ${params.PROJECT_TYPE}-${params.BRANCH_NAME}
                             --out ${OWASP_REPORT_DIR}
-                        """, odcInstallation: 'DP-check'
+                        """, odcInstallation: 'DP-Check'
                         
                         dependencyCheckPublisher pattern: "${OWASP_REPORT_DIR}/dependency-check-report.xml"
                     }
