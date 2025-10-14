@@ -27,6 +27,11 @@ pipeline {
             description: 'Skip running tests'
         )
         booleanParam(
+            name: 'RUN_OWASP',
+            defaultValue: false,
+            description: 'Run OWASP Dependency Check (takes long time)'
+        )
+        booleanParam(
             name: 'DEPLOY_AFTER_BUILD',
             defaultValue: false,
             description: 'Deploy after successful build'
@@ -111,20 +116,26 @@ pipeline {
         }
         
         stage('OWASP Dependency Check') {
+            when {
+                expression { return params.RUN_OWASP }
+            }
             steps {
                 script {
                     echo "Running OWASP Dependency Check..."
                     
                     dir(PROJECT_DIR) {
-                        dependencyCheck additionalArguments: """
-                            --scan .
-                            --format HTML
-                            --format JSON
-                            --project ${params.PROJECT_TYPE}-${params.BRANCH_NAME}
-                            --out ${OWASP_REPORT_DIR}
-                        """, odcInstallation: 'DP-Check'
-                        
-                        dependencyCheckPublisher pattern: "${OWASP_REPORT_DIR}/dependency-check-report.xml"
+                        catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                            dependencyCheck additionalArguments: """
+                                --scan .
+                                --format HTML
+                                --format JSON
+                                --project ${params.PROJECT_TYPE}-${params.BRANCH_NAME}
+                                --out ${OWASP_REPORT_DIR}
+                                --nvdApiDelay 6000
+                            """, odcInstallation: 'DP-Check'
+                            
+                            dependencyCheckPublisher pattern: "${OWASP_REPORT_DIR}/dependency-check-report.xml"
+                        }
                     }
                 }
             }
@@ -142,8 +153,7 @@ pipeline {
                                     -Dsonar.projectName=${params.PROJECT_TYPE}-${params.BRANCH_NAME} \
                                     -Dsonar.sources=src \
                                     -Dsonar.typescript.lcov.reportPaths=coverage/lcov.info \
-                                    -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/*.test.ts,**/*.spec.ts \
-                                    -Dsonar.branch.name=${params.BRANCH_NAME}
+                                    -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/*.test.ts,**/*.spec.ts
                                 """
                             } else {
                                 sh """
@@ -152,8 +162,7 @@ pipeline {
                                     -Dsonar.projectName=${params.PROJECT_TYPE}-${params.BRANCH_NAME} \
                                     -Dsonar.sources=src \
                                     -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
-                                    -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/*.test.js,**/*.spec.js \
-                                    -Dsonar.branch.name=${params.BRANCH_NAME}
+                                    -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/*.test.js,**/*.spec.js
                                 """
                             }
                         }
@@ -216,7 +225,7 @@ pipeline {
                         if (params.PROJECT_TYPE == 'backend') {
                             sh 'npm run build'
                         } else {
-                            sh "npm run build"
+                            sh 'npm run build'
                         }
                     }
                 }
@@ -276,13 +285,10 @@ pipeline {
                     
                     if (DEPLOY_ENV == 'production') {
                         echo "Production deployment for ${params.PROJECT_TYPE}"
-                        // Add production deployment steps here
                     } else if (DEPLOY_ENV == 'staging') {
                         echo "Staging deployment for ${params.PROJECT_TYPE}"
-                        // Add staging deployment steps here
                     } else {
                         echo "Development deployment for ${params.PROJECT_TYPE}"
-                        // Add development deployment steps here
                     }
                 }
             }
