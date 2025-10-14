@@ -2,7 +2,7 @@ pipeline {
     agent any
     
     tools {
-        nodejs 'node21'
+        nodejs 'nodejs21'
     }
     
     parameters {
@@ -291,16 +291,14 @@ pipeline {
     
     post {
         always {
-            echo "Cleaning up workspace..."
-            cleanWs()
+            script {
+                echo "Pipeline completed"
+            }
         }
         
         success {
-            script {
-                echo "Pipeline completed successfully for ${params.PROJECT_TYPE} - ${params.BRANCH_NAME}"
-                echo "Build Version: ${BUILD_VERSION}"
-                echo "Git Tag: ${params.CREATE_TAG ? GIT_TAG_NAME : 'No tag created'}"
-            }
+            echo "Pipeline completed successfully for ${params.PROJECT_TYPE} - ${params.BRANCH_NAME}"
+            echo "Build Version: ${BUILD_VERSION}"
         }
         
         failure {
