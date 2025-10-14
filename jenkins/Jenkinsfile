@@ -207,11 +207,14 @@ pipeline {
                 always {
                     junit allowEmptyResults: true, testResults: '**/test-results/**/*.xml'
                     publishHTML([
-                        reportDir: "${PROJECT_DIR}/coverage",
+                        allowMissing: true,
+                        alwaysLinkToLastBuild: true,
+                        keepAll: true,
+                        reportDir: 'coverage',
                         reportFiles: 'index.html',
                         reportName: 'Coverage Report',
-                        keepAll: true
-                    ])
+                        reportTitles: 'Code Coverage'
+                ])
                 }
             }
         }
