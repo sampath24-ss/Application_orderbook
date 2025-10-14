@@ -196,7 +196,7 @@ pipeline {
             }
             post {
                 always {
-                    junit "**/test-results/**/*.xml" allowEmptyResults: true
+                    junit allowEmptyResults: true, testResults: '**/test-results/**/*.xml'
                     publishHTML([
                         reportDir: "${PROJECT_DIR}/coverage",
                         reportFiles: 'index.html',
@@ -276,10 +276,13 @@ pipeline {
                     
                     if (DEPLOY_ENV == 'production') {
                         echo "Production deployment for ${params.PROJECT_TYPE}"
+                        // Add production deployment steps here
                     } else if (DEPLOY_ENV == 'staging') {
                         echo "Staging deployment for ${params.PROJECT_TYPE}"
+                        // Add staging deployment steps here
                     } else {
                         echo "Development deployment for ${params.PROJECT_TYPE}"
+                        // Add development deployment steps here
                     }
                 }
             }
