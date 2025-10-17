@@ -1,0 +1,187 @@
+# .github/workflows/pr-checks.yml
+name: PR Code Quality Checks
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+    types: [opened, synchronize, reopened]
+
+jobs:
+  code-quality:
+    name: Code Quality & Tests
+    runs-on: ubuntu-latest
+
+    services:
+      # PostgreSQL for testing
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      # Redis for testing
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    env:
+      NODE_ENV: test
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_NAME: test_db
+      DB_USER: test_user
+      DB_PASSWORD: test_password
+      REDIS_HOST: localhost
+      REDIS_PORT: 6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./backend
+        run: npm ci
+
+      # TypeScript compilation check
+      - name: TypeScript Check
+        working-directory: ./backend
+        run: npx tsc --noEmit
+
+      # Code formatting check
+      - name: Code Format Check
+        working-directory: ./backend
+        run: |
+          if [ -f ".prettierrc" ] || grep -q "prettier" package.json; then
+            npm run format:check || npx prettier --check "src/**/*.{ts,js,json}"
+          else
+            echo "Prettier not configured - skipping format check"
+          fi
+        continue-on-error: true
+
+      # Linting
+      - name: ESLint Check
+        working-directory: ./backend
+        run: |
+          if grep -q "eslint" package.json; then
+            npm run lint
+          else
+            echo "ESLint not configured - skipping lint check"
+          fi
+        continue-on-error: true
+
+      # Security audit
+      - name: Security Audit
+        working-directory: ./backend
+        run: |
+          echo "Checking for security vulnerabilities..."
+          npm audit --audit-level=moderate
+          
+          # Fail if high/critical vulnerabilities found
+          HIGH_VULNS=$(npm audit --audit-level=high --parseable | wc -l)
+          if [ $HIGH_VULNS -gt 0 ]; then
+            echo "High/Critical vulnerabilities found!"
+            npm audit --audit-level=high
+            exit 1
+          else
+            echo "No high/critical vulnerabilities found"
+          fi
+
+      # Wait for services to be ready
+      - name: Wait for services
+        run: |
+          echo "Waiting for PostgreSQL..."
+          until pg_isready -h localhost -p 5432 -U test_user; do sleep 2; done
+          
+          echo "Waiting for Redis..."
+          until redis-cli -h localhost -p 6379 ping; do sleep 2; done
+          
+          echo "Services are ready!"
+
+      # Run tests
+      - name: Run Tests
+        working-directory: ./backend
+        run: |
+          if grep -q '"test"' package.json; then
+            npm test
+          elif grep -q '"test:unit"' package.json; then
+            npm run test:unit
+          else
+            echo " No test script found in package.json"
+            echo "Please add a 'test' script to your package.json"
+          fi
+
+      # Build check
+      - name: Build Check
+        working-directory: ./backend
+        run: |
+          if grep -q '"build"' package.json; then
+            npm run build
+          else
+            echo "Building with TypeScript compiler..."
+            npx tsc
+          fi
+          echo " Build successful!"
+
+      # Generate test coverage (if available)
+      - name: Test Coverage
+        working-directory: ./backend
+        run: |
+          if grep -q '"test:coverage"' package.json; then
+            npm run test:coverage
+          else
+            echo "No coverage script found - skipping coverage report"
+          fi
+        continue-on-error: true
+
+      # Comment on PR with results
+      - name: PR Comment
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const jobStatus = '${{ job.status }}';
+            const icon = jobStatus === 'success' ? 'Yes' : 'No';
+            const message = jobStatus === 'success' ? 'All checks passed!' : 'Some checks failed!';
+            
+            const body = `## ${icon} Code Quality Check Results
+            
+            **Status**: ${message}
+            **Commit**: ${context.sha.substring(0, 7)}
+            **Checks performed**:
+            - TypeScript compilation
+            - Code formatting
+            - ESLint (if configured)
+            - Security audit
+            - Unit tests (if configured)
+            - Build verification
+            
+            ${jobStatus === 'failure' ? 'Please fix the failing checks before merging.' : 'Ready for review!'}
+            `;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
