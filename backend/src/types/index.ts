@@ -98,6 +98,7 @@ export interface OrderItem {
 }
 
 export interface CreateOrderRequest {
+    status: OrderStatus;
     customerId: string;
     items: CreateOrderItemRequest[];
     notes: string | null;

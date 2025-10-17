@@ -4,7 +4,7 @@ import { OrderController } from '../controllers/order.controller';
 
 const router = Router();
 
-
+ 
 router.post('/', asyncHandler(OrderController.createOrder));
 
 router.get('/', asyncHandler(OrderController.getAllOrders));

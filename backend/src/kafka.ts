@@ -234,7 +234,7 @@ export class KafkaService {
             eventType,
             timestamp: new Date(),
             data,
-            metadata
+            metadata 
         };
 
         await this.publishEvent(config.Kafka.topics.orderEvents, event);
