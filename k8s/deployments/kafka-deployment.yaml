@@ -20,4 +20,4 @@ spec:
         - containerPort: 9092
         envFrom:
         - configMapRef:
-            name: app-config
+            name: backend-config
