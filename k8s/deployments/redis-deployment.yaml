@@ -20,4 +20,4 @@ spec:
         - containerPort: 6379
         envFrom:
         - configMapRef:
-            name: app-config
+            name: backend-config
