@@ -20,6 +20,6 @@ spec:
         - containerPort: 5432
         envFrom:
         - configMapRef:
-            name: app-config
+            name: backend-config
         - secretRef:
             name: app-secrets
