@@ -20,7 +20,7 @@ spec:
       containers:
       - name: frontend
         image: sxmpath577/multi-tenant-frontend:v1
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         ports:
         - name: http
           containerPort: 80

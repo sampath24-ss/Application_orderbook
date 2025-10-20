@@ -20,7 +20,7 @@ spec:
       containers:
       - name: backend
         image: sxmpath577/multi-tenant-backend:v1
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: always
         ports:
         - containerPort: 3000
           name: http
