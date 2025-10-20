@@ -3,12 +3,12 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-  "build": "tsc",
-  "start": "node dist/server.js",
-  "dev": "ts-node-dev --respawn src/server.ts",
-  "test": "echo \"No tests specified\" && exit 0",
-  "lint": "echo \"No linting configured\" && exit 0"
-},
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "dev": "ts-node-dev --respawn src/server.ts",
+    "test": "echo \"No tests specified\" && exit 0",
+    "lint": "echo \"No linting configured\" && exit 0"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
@@ -42,5 +42,6 @@
     "uuid": "^13.0.0",
     "winston": "^3.18.3",
     "ws": "^8.18.3"
-  }
+  },
+  "description": ""
 }

@@ -1,4 +1,6 @@
-const API_BASE_URL = 'http://localhost:3000/api';
+const API_BASE_URL = window.location.hostname === 'localhost'
+    ? 'http://localhost:3000/api'
+    : '/api';
 
 class ApiService {
     async request(endpoint, options = {}) {
