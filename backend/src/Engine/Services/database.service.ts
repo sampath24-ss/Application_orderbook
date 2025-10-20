@@ -606,8 +606,11 @@ export class DatabaseService {
         if (fields.length === 0) {
             return await this.getCustomerById(id);
         }
+        const toSnakeCase = (str: string): string => {
+        return str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+        };
 
-        const setClause = fields.map((key, index) => `${key} = $${index + 2}`).join(', ');
+        const setClause = fields.map((key, index) => `${toSnakeCase(key)} = $${index + 2}`).join(', ');
 
         const query = `
             UPDATE customers 
