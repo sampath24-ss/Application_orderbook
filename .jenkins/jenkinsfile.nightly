@@ -103,7 +103,7 @@ pipeline {
                     echo "Using npm audit for dependency checking"
                 }
                 
-                dir('frontend') {
+                dir('frontend/frontend') {
                     script {
                         echo "Generating package-lock.json..."
                         sh 'npm install --package-lock-only'
