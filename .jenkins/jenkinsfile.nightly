@@ -26,7 +26,7 @@ pipeline {
         BUILD_TAG = "${GIT_BRANCH_NAME}-${BUILD_NUMBER}-${DATE_TAG}"
         
         // Email Configuration
-        EMAIL_RECIPIENT = 'your-email@example.com'
+        EMAIL_RECIPIENT = 'spidermanpeter018@gmail.com'
         
         // Scanner HOME
         SCANNER_HOME = tool name: "${SONAR_SCANNER}", type: 'hudson.plugins.sonar.SonarRunnerInstallation'
