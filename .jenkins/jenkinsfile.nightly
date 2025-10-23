@@ -159,9 +159,10 @@ pipeline {
                     echo "Using SonarQube Scanner: ${SONAR_SCANNER}"
                 }
                 
-                dir('frontend') {
+                dir('frontend/frontend') {
                     withSonarQubeEnv("${SONARQUBE_SERVER}") {
                         sh """
+                            set -x
                             ${SCANNER_HOME}/bin/sonar-scanner \
                                 -Dsonar.projectKey=multi-tenant-frontend \
                                 -Dsonar.projectName="Multi-Tenant Frontend" \
@@ -227,7 +228,7 @@ pipeline {
                     echo "Image: ${FRONTEND_IMAGE}:${BUILD_TAG}"
                 }
                 
-                dir('frontend') {
+                dir('frontend/frontend') {
                     script {
                         sh """
                             docker build -t ${FRONTEND_IMAGE}:${BUILD_TAG} .
