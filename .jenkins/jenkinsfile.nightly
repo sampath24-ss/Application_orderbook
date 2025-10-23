@@ -35,7 +35,7 @@ pipeline {
     
     triggers {
         // Run every night at 12:00 AM IST (6:30 PM UTC previous day)
-        cron('1 17 * * *')
+        cron('H 17 * * *')
     }
     
     options {
