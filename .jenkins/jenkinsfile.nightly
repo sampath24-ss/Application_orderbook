@@ -1,0 +1,459 @@
+pipeline {
+    agent any
+    
+    tools {
+        nodejs 'node16'
+    }
+    
+    environment {
+        // Docker Registry Configuration
+        DOCKER_REGISTRY = 'sxmpath577'
+        DOCKER_CREDENTIALS_ID = 'dockerhub-credentials'
+        BACKEND_IMAGE = "${DOCKER_REGISTRY}/multi-tenant-backend"
+        FRONTEND_IMAGE = "${DOCKER_REGISTRY}/multi-tenant-frontend"
+        
+        // SonarQube Configuration
+        SONARQUBE_SERVER = 'mysonar'
+        SONARQUBE_URL = 'http://localhost:9000'
+        
+        // Tool Names (matching your Jenkins configuration)
+        SONAR_SCANNER = 'mysonar'
+        DEPENDENCY_CHECK = 'DP-Check'
+        
+        // Build Information
+        DATE_TAG = sh(script: "date +%Y%m%d", returnStdout: true).trim()
+        GIT_BRANCH_NAME = sh(script: "echo ${GIT_BRANCH} | sed 's|origin/||' | sed 's|/|-|g'", returnStdout: true).trim()
+        BUILD_TAG = "${GIT_BRANCH_NAME}-${BUILD_NUMBER}-${DATE_TAG}"
+        
+        // Email Configuration
+        EMAIL_RECIPIENT = 'your-email@example.com'
+        
+        // Scanner HOME
+        SCANNER_HOME = tool name: "${SONAR_SCANNER}", type: 'hudson.plugins.sonar.SonarRunnerInstallation'
+    }
+    
+    triggers {
+        // Run every night at 12:00 AM IST (6:30 PM UTC previous day)
+        cron('30 18 * * *')
+    }
+    
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        timeout(time: 1, unit: 'HOURS')
+        timestamps()
+    }
+    
+    stages {
+        stage('Checkout Code') {
+            steps {
+                script {
+                    echo "STAGE 1: Checking out code"
+                    echo "Branch: ${env.GIT_BRANCH}"
+                    echo "Build Number: ${env.BUILD_NUMBER}"
+                }
+                
+                checkout scm
+                
+                script {
+                    env.GIT_COMMIT_SHORT = sh(
+                        script: "git rev-parse --short HEAD",
+                        returnStdout: true
+                    ).trim()
+                    
+                    echo "Commit: ${env.GIT_COMMIT_SHORT}"
+                    echo "Build Tag: ${BUILD_TAG}"
+                }
+            }
+        }
+        
+        stage('Backend - OWASP Dependency Check') {
+            steps {
+                script {
+                    echo "========================================="
+                    echo "STAGE 2: Backend OWASP Dependency Check"
+                    echo "Using npm audit for dependency checking"
+                    echo "========================================="
+                }
+                
+                dir('backend') {
+                    script {
+                        // Run npm audit
+                        def auditResult = sh(
+                            script: 'npm audit --audit-level=critical',
+                            returnStatus: true
+                        )
+                        
+                        if (auditResult != 0) {
+                            echo "WARNING: Critical vulnerabilities found in backend dependencies"
+                            sh 'npm audit --audit-level=critical || true'
+                            error("Critical vulnerabilities found in backend. Pipeline stopped.")
+                        }
+                        
+                        echo "Installing backend dependencies..."
+                        sh 'npm ci'
+                        echo "Backend dependency check completed successfully"
+                    }
+                }
+            }
+        }
+        
+        stage('Frontend - OWASP Dependency Check') {
+            steps {
+                script {
+                    echo "STAGE 3: Frontend OWASP Dependency Check"
+                    echo "Using npm audit for dependency checking"
+                }
+                
+                dir('frontend') {
+                    script {
+                        // Run npm audit
+                        def auditResult = sh(
+                            script: 'npm audit --audit-level=critical',
+                            returnStatus: true
+                        )
+                        
+                        if (auditResult != 0) {
+                            echo "WARNING: Critical vulnerabilities found in frontend dependencies"
+                            sh 'npm audit --audit-level=critical || true'
+                            error("Critical vulnerabilities found in frontend. Pipeline stopped.")
+                        }
+                        
+                        echo "Installing frontend dependencies..."
+                        sh 'npm ci'
+                        echo "Frontend dependency check completed successfully"
+                    }
+                }
+            }
+        }
+        
+        stage('Backend - SonarQube Analysis') {
+            steps {
+                script {
+                    echo "STAGE 4: Backend SonarQube Code Analysis"
+                    echo "Using SonarQube Scanner: ${SONAR_SCANNER}"
+                }
+                
+                dir('backend') {
+                    withSonarQubeEnv("${SONARQUBE_SERVER}") {
+                        sh """
+                            ${SCANNER_HOME}/bin/sonar-scanner \
+                                -Dsonar.projectKey=multi-tenant-backend \
+                                -Dsonar.projectName="Multi-Tenant Backend" \
+                                -Dsonar.sources=src \
+                                -Dsonar.typescript.node=node_modules \
+                                -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/coverage/** \
+                                -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+                        """
+                    }
+                }
+                
+                echo "Backend SonarQube analysis completed"
+            }
+        }
+        
+        stage('Frontend - SonarQube Analysis') {
+            steps {
+                script {
+                    echo "STAGE 5: Frontend SonarQube Code Analysis"
+                    echo "Using SonarQube Scanner: ${SONAR_SCANNER}"
+                }
+                
+                dir('frontend') {
+                    withSonarQubeEnv("${SONARQUBE_SERVER}") {
+                        sh """
+                            ${SCANNER_HOME}/bin/sonar-scanner \
+                                -Dsonar.projectKey=multi-tenant-frontend \
+                                -Dsonar.projectName="Multi-Tenant Frontend" \
+                                -Dsonar.sources=src \
+                                -Dsonar.javascript.node=node_modules \
+                                -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/build/**,**/coverage/**
+                        """
+                    }
+                }
+                
+                echo "Frontend SonarQube analysis completed"
+            }
+        }
+        
+        stage('SonarQube Quality Gate') {
+            steps {
+                script {
+                    echo "STAGE 6: Waiting for SonarQube Quality Gate"
+                }
+                
+                timeout(time: 5, unit: 'MINUTES') {
+                    script {
+                        try {
+                            def qg = waitForQualityGate()
+                            if (qg.status != 'OK') {
+                                error "Pipeline aborted due to quality gate failure: ${qg.status}"
+                            }
+                            echo "Quality Gate passed successfully"
+                        } catch (Exception e) {
+                            echo "Quality Gate check failed or timed out: ${e.message}"
+                            error("SonarQube Quality Gate check failed")
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Build Backend Docker Image') {
+            steps {
+                script {
+                    echo "STAGE 7: Building Backend Docker Image"
+                    echo "Image: ${BACKEND_IMAGE}:${BUILD_TAG}"
+                }
+                
+                dir('backend') {
+                    script {
+                        sh """
+                            docker build -t ${BACKEND_IMAGE}:${BUILD_TAG} .
+                            docker tag ${BACKEND_IMAGE}:${BUILD_TAG} ${BACKEND_IMAGE}:${GIT_BRANCH_NAME}-latest
+                        """
+                        
+                        echo "Backend Docker image built successfully"
+                        sh "docker images | grep multi-tenant-backend"
+                    }
+                }
+            }
+        }
+        
+        stage('Build Frontend Docker Image') {
+            steps {
+                script {
+                    echo "STAGE 8: Building Frontend Docker Image"
+                    echo "Image: ${FRONTEND_IMAGE}:${BUILD_TAG}"
+                }
+                
+                dir('frontend') {
+                    script {
+                        sh """
+                            docker build -t ${FRONTEND_IMAGE}:${BUILD_TAG} .
+                            docker tag ${FRONTEND_IMAGE}:${BUILD_TAG} ${FRONTEND_IMAGE}:${GIT_BRANCH_NAME}-latest
+                        """
+                        
+                        echo "Frontend Docker image built successfully"
+                        sh "docker images | grep multi-tenant-frontend"
+                    }
+                }
+            }
+        }
+        
+        stage('Trivy Scan - Backend Image') {
+            steps {
+                script {
+                    echo "STAGE 9: Trivy Security Scan - Backend"
+                }
+                
+                script {
+                    // Check if Trivy is installed
+                    def trivyInstalled = sh(
+                        script: 'which trivy',
+                        returnStatus: true
+                    )
+                    
+                    if (trivyInstalled != 0) {
+                        echo "Installing Trivy..."
+                        sh '''
+                            curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+                        '''
+                    }
+                    
+                    // Run Trivy scan
+                    def trivyResult = sh(
+                        script: """
+                            trivy image \
+                                --severity CRITICAL,HIGH \
+                                --exit-code 1 \
+                                --no-progress \
+                                ${BACKEND_IMAGE}:${BUILD_TAG}
+                        """,
+                        returnStatus: true
+                    )
+                    
+                    if (trivyResult != 0) {
+                        echo "CRITICAL/HIGH vulnerabilities found in backend image"
+                        sh "trivy image --severity CRITICAL,HIGH ${BACKEND_IMAGE}:${BUILD_TAG} || true"
+                        error("Critical vulnerabilities found in backend image")
+                    }
+                    
+                    echo "Backend image scan completed - No critical vulnerabilities"
+                }
+            }
+        }
+        
+        stage('Trivy Scan - Frontend Image') {
+            steps {
+                script {
+                    echo "STAGE 10: Trivy Security Scan - Frontend"
+                }
+                
+                script {
+                    // Run Trivy scan
+                    def trivyResult = sh(
+                        script: """
+                            trivy image \
+                                --severity CRITICAL,HIGH \
+                                --exit-code 1 \
+                                --no-progress \
+                                ${FRONTEND_IMAGE}:${BUILD_TAG}
+                        """,
+                        returnStatus: true
+                    )
+                    
+                    if (trivyResult != 0) {
+                        echo "CRITICAL/HIGH vulnerabilities found in frontend image"
+                        sh "trivy image --severity CRITICAL,HIGH ${FRONTEND_IMAGE}:${BUILD_TAG} || true"
+                        error("Critical vulnerabilities found in frontend image")
+                    }
+                    
+                    echo "Frontend image scan completed - No critical vulnerabilities"
+                }
+            }
+        }
+        
+        stage('Push to DockerHub') {
+            steps {
+                script {
+                    echo "STAGE 11: Pushing Images to DockerHub"
+                }
+                
+                script {
+                    docker.withRegistry('https://index.docker.io/v1/', "${DOCKER_CREDENTIALS_ID}") {
+                        echo "Pushing backend images..."
+                        sh """
+                            docker push ${BACKEND_IMAGE}:${BUILD_TAG}
+                            docker push ${BACKEND_IMAGE}:${GIT_BRANCH_NAME}-latest
+                        """
+                        
+                        echo "Pushing frontend images..."
+                        sh """
+                            docker push ${FRONTEND_IMAGE}:${BUILD_TAG}
+                            docker push ${FRONTEND_IMAGE}:${GIT_BRANCH_NAME}-latest
+                        """
+                    }
+                }
+                
+                echo "All images pushed successfully to DockerHub"
+            }
+        }
+        
+        stage('Cleanup') {
+            steps {
+                script {
+                    echo "STAGE 12: Cleaning up local Docker images"
+                }
+                
+                sh """
+                    echo "Removing local backend images..."
+                    docker rmi ${BACKEND_IMAGE}:${BUILD_TAG} || true
+                    docker rmi ${BACKEND_IMAGE}:${GIT_BRANCH_NAME}-latest || true
+                    
+                    echo "Removing local frontend images..."
+                    docker rmi ${FRONTEND_IMAGE}:${BUILD_TAG} || true
+                    docker rmi ${FRONTEND_IMAGE}:${GIT_BRANCH_NAME}-latest || true
+                    
+                    echo "Cleanup completed"
+                    docker images
+                """
+            }
+        }
+    }
+    
+    post {
+        success {
+            script {
+                echo "PIPELINE COMPLETED SUCCESSFULLY"
+                
+                emailext (
+                    subject: "SUCCESS: Nightly Build ${BUILD_TAG} - ${env.JOB_NAME}",
+                    body: """
+                    <html>
+                    <body>
+                        <h2 style="color: green;">Build Successful</h2>
+                        <p><strong>Project:</strong> Multi-Tenant Application</p>
+                        <p><strong>Build Number:</strong> ${env.BUILD_NUMBER}</p>
+                        <p><strong>Branch:</strong> ${env.GIT_BRANCH}</p>
+                        <p><strong>Commit:</strong> ${env.GIT_COMMIT_SHORT}</p>
+                        <p><strong>Build Tag:</strong> ${BUILD_TAG}</p>
+                        <p><strong>Date:</strong> ${DATE_TAG}</p>
+                        
+                        <h3>Docker Images Pushed:</h3>
+                        <ul>
+                            <li>${BACKEND_IMAGE}:${BUILD_TAG}</li>
+                            <li>${BACKEND_IMAGE}:${GIT_BRANCH_NAME}-latest</li>
+                            <li>${FRONTEND_IMAGE}:${BUILD_TAG}</li>
+                            <li>${FRONTEND_IMAGE}:${GIT_BRANCH_NAME}-latest</li>
+                        </ul>
+                        
+                        <h3>Security Scans:</h3>
+                        <ul>
+                            <li>OWASP Dependency Check: PASSED</li>
+                            <li>SonarQube Quality Gate: PASSED</li>
+                            <li>Trivy Container Scan: PASSED</li>
+                        </ul>
+                        
+                        <p><a href="${env.BUILD_URL}">View Build Details</a></p>
+                        <p><a href="${SONARQUBE_URL}">View SonarQube Reports</a></p>
+                    </body>
+                    </html>
+                    """,
+                    to: "${EMAIL_RECIPIENT}",
+                    mimeType: 'text/html',
+                    attachLog: true
+                )
+            }
+        }
+        
+        failure {
+            script {
+                echo "PIPELINE FAILED"
+                
+                emailext (
+                    subject: "FAILURE: Nightly Build ${BUILD_TAG} - ${env.JOB_NAME}",
+                    body: """
+                    <html>
+                    <body>
+                        <h2 style="color: red;">Build Failed</h2>
+                        <p><strong>Project:</strong> Multi-Tenant Application</p>
+                        <p><strong>Build Number:</strong> ${env.BUILD_NUMBER}</p>
+                        <p><strong>Branch:</strong> ${env.GIT_BRANCH}</p>
+                        <p><strong>Commit:</strong> ${env.GIT_COMMIT_SHORT}</p>
+                        <p><strong>Build Tag:</strong> ${BUILD_TAG}</p>
+                        <p><strong>Date:</strong> ${DATE_TAG}</p>
+                        
+                        <h3>Failure Information:</h3>
+                        <p>The pipeline failed during execution. Please check the build logs for details.</p>
+                        
+                        <h3>Possible Causes:</h3>
+                        <ul>
+                            <li>Critical vulnerabilities in dependencies (npm audit)</li>
+                            <li>Code quality issues (SonarQube)</li>
+                            <li>Container vulnerabilities (Trivy)</li>
+                            <li>Build or test failures</li>
+                        </ul>
+                        
+                        <p><a href="${env.BUILD_URL}console">View Console Output</a></p>
+                        <p><a href="${env.BUILD_URL}">View Build Details</a></p>
+                        <p><a href="${SONARQUBE_URL}">View SonarQube Reports</a></p>
+                    </body>
+                    </html>
+                    """,
+                    to: "${EMAIL_RECIPIENT}",
+                    mimeType: 'text/html',
+                    attachLog: true
+                )
+            }
+        }
+        
+        always {
+            script {
+                echo "PIPELINE EXECUTION COMPLETED"
+                echo "Duration: ${currentBuild.durationString}"
+            }
+            
+            cleanWs()
+        }
+    }
+}
