@@ -28,6 +28,7 @@ pipeline {
         // Email Configuration
         EMAIL_RECIPIENT = 'spidermanpeter018@gmail.com'
         
+        
         // Scanner HOME
         SCANNER_HOME = tool name: "${SONAR_SCANNER}", type: 'hudson.plugins.sonar.SonarRunnerInstallation'
     }
@@ -69,10 +70,8 @@ pipeline {
         stage('Backend - OWASP Dependency Check') {
             steps {
                 script {
-                    echo "========================================="
                     echo "STAGE 2: Backend OWASP Dependency Check"
                     echo "Using npm audit for dependency checking"
-                    echo "========================================="
                 }
                 
                 dir('backend') {
@@ -106,13 +105,15 @@ pipeline {
                 
                 dir('frontend') {
                     script {
-                        // Run npm audit
+                        echo "Generating package-lock.json..."
+                        sh 'npm install --package-lock-only'
                         def auditResult = sh(
                             script: 'npm audit --audit-level=critical',
                             returnStatus: true
                         )
                         
                         if (auditResult != 0) {
+                            sh 'npm install --package-lock-only'
                             echo "WARNING: Critical vulnerabilities found in frontend dependencies"
                             sh 'npm audit --audit-level=critical || true'
                             error("Critical vulnerabilities found in frontend. Pipeline stopped.")
