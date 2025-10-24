@@ -1,0 +1,77 @@
+global:
+  environment: test
+  namespace: multitenant-test
+
+backend:
+  replicaCount: 2
+  image:
+    repository: your-registry/multitenant-backend
+    tag: "test-v1.0"
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+  autoscaling:
+    enabled: false
+
+frontend:
+  replicaCount: 2
+  image:
+    repository: your-registry/multitenant-frontend
+    tag: "test-v1.0"
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+
+postgres:
+  persistence:
+    size: 10Gi
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+
+redis:
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+
+kafka:
+  persistence:
+    size: 5Gi
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+
+ingress:
+  enabled: true
+  hosts:
+    - host: multitenant-test.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: frontend
+        - path: /api
+          pathType: Prefix
+          service: backend
+
+networkPolicy:
+  enabled: false

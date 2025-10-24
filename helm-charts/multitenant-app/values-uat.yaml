@@ -1,0 +1,84 @@
+global:
+  environment: uat
+  namespace: multitenant-uat
+
+backend:
+  replicaCount: 3
+  image:
+    repository: your-registry/multitenant-backend
+    tag: "uat-v1.2"
+  resources:
+    limits:
+      cpu: 1500m
+      memory: 2Gi
+    requests:
+      cpu: 750m
+      memory: 1Gi
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 75
+
+frontend:
+  replicaCount: 2
+  image:
+    repository: your-registry/multitenant-frontend
+    tag: "uat-v1.2"
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+
+postgres:
+  persistence:
+    size: 20Gi
+  resources:
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+
+redis:
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+
+kafka:
+  persistence:
+    size: 10Gi
+  resources:
+    limits:
+      cpu: 1500m
+      memory: 2Gi
+    requests:
+      cpu: 750m
+      memory: 1Gi
+
+ingress:
+  enabled: true
+  hosts:
+    - host: multitenant-uat.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: frontend
+        - path: /api
+          pathType: Prefix
+          service: backend
+  tls:
+    - secretName: multitenant-uat-tls
+      hosts:
+        - multitenant-uat.example.com
+
+networkPolicy:
+  enabled: true

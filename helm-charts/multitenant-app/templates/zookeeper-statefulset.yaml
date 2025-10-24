@@ -1,0 +1,93 @@
+{{- if and .Values.kafka.enabled .Values.kafka.zookeeper.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "multitenant-app.fullname" . }}-zookeeper
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "multitenant-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: zookeeper
+spec:
+  serviceName: {{ include "multitenant-app.fullname" . }}-zookeeper
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "multitenant-app.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: zookeeper
+  template:
+    metadata:
+      labels:
+        {{- include "multitenant-app.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: zookeeper
+    spec:
+      {{- if .Values.serviceAccount.create }}
+      serviceAccountName: {{ include "multitenant-app.serviceAccountName" . }}
+      {{- end }}
+      containers:
+        - name: zookeeper
+          image: "{{ .Values.kafka.zookeeper.image.repository }}:{{ .Values.kafka.zookeeper.image.tag }}"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: client
+              containerPort: {{ .Values.kafka.zookeeper.service.port }}
+              protocol: TCP
+            - name: server
+              containerPort: 2888
+              protocol: TCP
+            - name: leader-election
+              containerPort: 3888
+              protocol: TCP
+          env:
+            - name: ZOOKEEPER_CLIENT_PORT
+              value: "{{ .Values.kafka.zookeeper.service.port }}"
+            - name: ZOOKEEPER_TICK_TIME
+              value: "2000"
+            - name: ZOOKEEPER_SERVER_ID
+              value: "1"
+          volumeMounts:
+            - name: zookeeper-data
+              mountPath: /var/lib/zookeeper/data
+            - name: zookeeper-logs
+              mountPath: /var/lib/zookeeper/log
+          resources:
+            {{- toYaml .Values.kafka.zookeeper.resources | nindent 12 }}
+          livenessProbe:
+            tcpSocket:
+              port: client
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            tcpSocket:
+              port: client
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+  {{- if .Values.kafka.zookeeper.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: zookeeper-data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: {{ .Values.kafka.zookeeper.persistence.size }}
+    - metadata:
+        name: zookeeper-logs
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+  {{- else }}
+  volumes:
+    - name: zookeeper-data
+      emptyDir: {}
+    - name: zookeeper-logs
+      emptyDir: {}
+  {{- end }}
+{{- end }}

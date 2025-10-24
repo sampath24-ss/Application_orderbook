@@ -1,0 +1,51 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "multitenant-app.fullname" . }}-netpol
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "multitenant-app.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "multitenant-app.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    {{- toYaml .Values.networkPolicy.policyTypes | nindent 4 }}
+  ingress:
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            name: {{ .Values.global.namespace }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.backend.service.port }}
+        - protocol: TCP
+          port: {{ .Values.frontend.service.port }}
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: {{ .Values.backend.service.port }}
+        - protocol: TCP
+          port: {{ .Values.frontend.service.port }}
+  egress:
+    - to:
+      - namespaceSelector:
+          matchLabels:
+            name: {{ .Values.global.namespace }}
+    - to:
+      - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53
+    - to:
+      - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443
+{{- end }}
