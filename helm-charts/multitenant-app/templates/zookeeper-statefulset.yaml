@@ -23,6 +23,10 @@ spec:
       {{- if .Values.serviceAccount.create }}
       serviceAccountName: {{ include "multitenant-app.serviceAccountName" . }}
       {{- end }}
+      {{- if .Values.kafka.zookeeper.initContainers }}
+      initContainers:
+        {{- toYaml .Values.kafka.zookeeper.initContainers | nindent 8 }}
+      {{- end }}
       containers:
         - name: zookeeper
           image: "{{ .Values.kafka.zookeeper.image.repository }}:{{ .Values.kafka.zookeeper.image.tag }}"
