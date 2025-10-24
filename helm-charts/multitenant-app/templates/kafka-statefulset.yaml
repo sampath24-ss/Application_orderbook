@@ -20,6 +20,10 @@ spec:
       {{- if .Values.serviceAccount.create }}
       serviceAccountName: {{ include "multitenant-app.serviceAccountName" . }}
       {{- end }}
+      {{- if .Values.kafka.initContainers }}
+      initContainers:
+        {{- toYaml .Values.kafka.initContainers | nindent 8 }}
+      {{- end }}
       containers:
         - name: kafka
           image: "{{ .Values.kafka.image.repository }}:{{ .Values.kafka.image.tag }}"
