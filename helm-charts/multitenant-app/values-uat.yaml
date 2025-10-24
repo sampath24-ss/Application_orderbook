@@ -3,10 +3,12 @@ global:
   namespace: multitenant-uat
 
 backend:
+  enabled: true
   replicaCount: 3
   image:
-    repository: your-registry/multitenant-backend
-    tag: "uat-v1.2"
+    repository: sxmpath577/multitenant-backend
+    tag: "uat-latest"
+    pullPolicy: Always
   resources:
     limits:
       cpu: 1500m
@@ -23,8 +25,9 @@ backend:
 frontend:
   replicaCount: 2
   image:
-    repository: your-registry/multitenant-frontend
-    tag: "uat-v1.2"
+    repository: sxmpath577/multitenant-frontend
+    tag: "uat-latest"
+    pullPolicy: Always
   resources:
     limits:
       cpu: 500m

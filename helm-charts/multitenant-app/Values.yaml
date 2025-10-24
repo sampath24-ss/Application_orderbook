@@ -9,7 +9,7 @@ backend:
   enable: true
   replicaCount: 2
 
-  image: 
+  image:
     repository: sxmpath577/multi-tenant-backend
     pullPolicy: IfNotPresent
     tage: "latest"

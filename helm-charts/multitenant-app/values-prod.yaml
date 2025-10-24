@@ -3,10 +3,12 @@ global:
   namespace: multitenant-prod
 
 backend:
+  enabled: true
   replicaCount: 5
   image:
-    repository: your-registry/multitenant-backend
-    tag: "v1.5.0"
+    repository: sxmpath577/multitenant-backend
+    tag: "prod-latest"
+    pullPolicy: Always
   resources:
     limits:
       cpu: 2000m
@@ -22,10 +24,12 @@ backend:
     targetMemoryUtilizationPercentage: 80
 
 frontend:
+  enabled: true
   replicaCount: 3
   image:
-    repository: your-registry/multitenant-frontend
-    tag: "v1.5.0"
+    repository: sxmpath577/multitenant-frontend
+    tag: "prod-latest"
+    pullPolicy: Always
   resources:
     limits:
       cpu: 1000m
@@ -40,6 +44,7 @@ frontend:
     targetCPUUtilizationPercentage: 70
 
 postgres:
+  enabled: true
   persistence:
     size: 100Gi
     storageClass: "fast-ssd"
@@ -52,6 +57,7 @@ postgres:
       memory: 4Gi
 
 redis:
+  enabled: true
   resources:
     limits:
       cpu: 1000m
@@ -61,6 +67,7 @@ redis:
       memory: 512Mi
 
 kafka:
+  enabled: true
   persistence:
     size: 50Gi
     storageClass: "fast-ssd"

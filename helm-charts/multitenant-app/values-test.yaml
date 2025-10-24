@@ -3,10 +3,12 @@ global:
   namespace: multitenant-test
 
 backend:
+  enabled: true
   replicaCount: 2
   image:
-    repository: your-registry/multitenant-backend
-    tag: "test-v1.0"
+    repository: sxmpath577/multitenant-backend
+    tag: "test-latest"
+    pullPolicy: Always
   resources:
     limits:
       cpu: 1000m
@@ -18,10 +20,12 @@ backend:
     enabled: false
 
 frontend:
+  enabled: true
   replicaCount: 2
   image:
-    repository: your-registry/multitenant-frontend
-    tag: "test-v1.0"
+    repository: sxmpath577/multitenant-frontend
+    tag: "test-latest"
+    pullPolicy: Always
   resources:
     limits:
       cpu: 500m
@@ -31,6 +35,7 @@ frontend:
       memory: 256Mi
 
 postgres:
+  enabled: true
   persistence:
     size: 10Gi
   resources:
@@ -42,6 +47,7 @@ postgres:
       memory: 1Gi
 
 redis:
+  enabled: true
   resources:
     limits:
       cpu: 500m
@@ -51,6 +57,7 @@ redis:
       memory: 256Mi
 
 kafka:
+  enabled: true
   persistence:
     size: 5Gi
   resources:
