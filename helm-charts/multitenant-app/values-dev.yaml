@@ -83,6 +83,8 @@ redis:
 
 kafka:
   enabled: true
+  persistence:
+    enabled: false
   image:
     repository: confluentinc/cp-kafka
     tag: "7.5.0"
@@ -143,7 +145,7 @@ configMap:
     DATABASE_PORT: "5432"
     REDIS_HOST: "multitenant-dev-multitenant-app-redis"
     REDIS_PORT: "6379"
-    KAFKA_BROKERS: "multitenant-dev-multitenant-app-kafka:9092"
+    KAFKA_BROKERS: "kafka-service:9092"
 
 secrets:
   data:
