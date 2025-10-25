@@ -20,19 +20,6 @@ spec:
       {{- if .Values.serviceAccount.create }}
       serviceAccountName: {{ include "multitenant-app.serviceAccountName" . }}
       {{- end }}
-      securityContext:
-        fsGroup: 1000
-        runAsUser: 1000
-        runAsNonRoot: true
-      initContainers:
-        - name: volume-permissions
-          image: busybox:latest
-          command: ['sh', '-c', 'chown -R 1000:1000 /var/lib/kafka/data']
-          volumeMounts:
-            - name: kafka-data
-              mountPath: /var/lib/kafka/data
-          securityContext:
-            runAsUser: 0
       containers:
         - name: kafka
           image: "{{ .Values.kafka.image.repository }}:{{ .Values.kafka.image.tag }}"
