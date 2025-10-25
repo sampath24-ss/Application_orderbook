@@ -22,12 +22,10 @@ spec:
       {{- end }}
       securityContext:
         fsGroup: 1000
-        runAsUser: 1000
-        runAsNonRoot: true
       initContainers:
-        - name: volume-permissions
+        - name: fix-permissions
           image: busybox:latest
-          command: ['sh', '-c', 'chown -R 1000:1000 /var/lib/kafka/data']
+          command: ['sh', '-c', 'chmod -R 777 /var/lib/kafka/data && chown -R 1000:1000 /var/lib/kafka/data']
           volumeMounts:
             - name: kafka-data
               mountPath: /var/lib/kafka/data
@@ -37,6 +35,9 @@ spec:
         - name: kafka
           image: "{{ .Values.kafka.image.repository }}:{{ .Values.kafka.image.tag }}"
           imagePullPolicy: {{ .Values.kafka.image.pullPolicy }}
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
           ports:
             - name: kafka
               containerPort: {{ .Values.kafka.service.targetPort }}
@@ -89,10 +90,7 @@ spec:
           {{- include "multitenant-app.kafka.labels" . | nindent 10 }}
       spec:
         accessModes:
-          - {{ .Values.kafka.persistence.accessMode }}
-        {{- if .Values.kafka.persistence.storageClass }}
-        storageClassName: {{ .Values.kafka.persistence.storageClass }}
-        {{- end }}
+          - ReadWriteOnce
         resources:
           requests:
             storage: {{ .Values.kafka.persistence.size }}
