@@ -1,75 +1,52 @@
-{{- if and .Values.kafka.enabled .Values.kafka.zookeeper.enabled }}
+{{- if .Values.zookeeper.enabled }}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: {{ include "multitenant-app.fullname" . }}-zookeeper
   namespace: {{ .Values.global.namespace }}
   labels:
-    {{- include "multitenant-app.labels" . | nindent 4 }}
-    app.kubernetes.io/component: zookeeper
+    {{- include "multitenant-app.zookeeper.labels" . | nindent 4 }}
 spec:
   serviceName: {{ include "multitenant-app.fullname" . }}-zookeeper
   replicas: 1
   selector:
     matchLabels:
-      {{- include "multitenant-app.selectorLabels" . | nindent 6 }}
-      app.kubernetes.io/component: zookeeper
+      {{- include "multitenant-app.zookeeper.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "multitenant-app.selectorLabels" . | nindent 8 }}
-        app.kubernetes.io/component: zookeeper
+        {{- include "multitenant-app.zookeeper.selectorLabels" . | nindent 8 }}
     spec:
       {{- if .Values.serviceAccount.create }}
       serviceAccountName: {{ include "multitenant-app.serviceAccountName" . }}
       {{- end }}
-      {{- if .Values.kafka.zookeeper.initContainers }}
-      initContainers:
-        {{- toYaml .Values.kafka.zookeeper.initContainers | nindent 8 }}
-      {{- end }}
       containers:
         - name: zookeeper
-          image: "{{ .Values.kafka.zookeeper.image.repository }}:{{ .Values.kafka.zookeeper.image.tag }}"
-          imagePullPolicy: IfNotPresent
+          image: "{{ .Values.zookeeper.image.repository }}:{{ .Values.zookeeper.image.tag }}"
+          imagePullPolicy: {{ .Values.zookeeper.image.pullPolicy }}
           ports:
             - name: client
-              containerPort: {{ .Values.kafka.zookeeper.service.port }}
+              containerPort: {{ .Values.zookeeper.service.port }}
               protocol: TCP
-            - name: server
+            - name: follower
               containerPort: 2888
               protocol: TCP
-            - name: leader-election
+            - name: election
               containerPort: 3888
               protocol: TCP
           env:
             - name: ZOOKEEPER_CLIENT_PORT
-              value: "{{ .Values.kafka.zookeeper.service.port }}"
+              value: "{{ .Values.zookeeper.service.port }}"
             - name: ZOOKEEPER_TICK_TIME
               value: "2000"
-            - name: ZOOKEEPER_SERVER_ID
-              value: "1"
           volumeMounts:
             - name: zookeeper-data
               mountPath: /var/lib/zookeeper/data
-            - name: zookeeper-logs
+            - name: zookeeper-log
               mountPath: /var/lib/zookeeper/log
           resources:
-            {{- toYaml .Values.kafka.zookeeper.resources | nindent 12 }}
-          livenessProbe:
-            tcpSocket:
-              port: client
-            initialDelaySeconds: 30
-            periodSeconds: 10
-            timeoutSeconds: 5
-            failureThreshold: 3
-          readinessProbe:
-            tcpSocket:
-              port: client
-            initialDelaySeconds: 10
-            periodSeconds: 5
-            timeoutSeconds: 3
-            failureThreshold: 3
-  {{- if .Values.kafka.zookeeper.persistence.enabled }}
+            {{- toYaml .Values.zookeeper.resources | nindent 12 }}
+  {{- if .Values.zookeeper.persistence.enabled }}
   volumeClaimTemplates:
     - metadata:
         name: zookeeper-data
@@ -78,9 +55,9 @@ spec:
           - ReadWriteOnce
         resources:
           requests:
-            storage: {{ .Values.kafka.zookeeper.persistence.size }}
+            storage: {{ .Values.zookeeper.persistence.size }}
     - metadata:
-        name: zookeeper-logs
+        name: zookeeper-log
       spec:
         accessModes:
           - ReadWriteOnce
@@ -91,7 +68,7 @@ spec:
   volumes:
     - name: zookeeper-data
       emptyDir: {}
-    - name: zookeeper-logs
+    - name: zookeeper-log
       emptyDir: {}
   {{- end }}
 {{- end }}
