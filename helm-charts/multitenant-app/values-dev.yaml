@@ -87,7 +87,7 @@ zookeeper:
   replicaCount: 1
   image:
     repository: bitnami/zookeeper
-    tag: "3.9.2-debian-12-r0"
+    tag: "latest"
     pullPolicy: IfNotPresent
   env:
     - name: ALLOW_ANONYMOUS_LOGIN
@@ -114,7 +114,7 @@ kafka:
   replicaCount: 1
   image:
     repository: bitnami/kafka
-    tag: "3.6.1-debian-12-r4"
+    tag: "latest"
     pullPolicy: IfNotPresent
   env:
     - name: KAFKA_CFG_ZOOKEEPER_CONNECT
