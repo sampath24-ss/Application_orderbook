@@ -25,7 +25,18 @@ spec:
       initContainers:
         - name: fix-permissions
           image: busybox:latest
-          command: ['sh', '-c', 'chmod -R 777 /var/lib/kafka/data']
+          command:
+            - sh
+            - -c
+            - |
+              rm -rf /var/lib/kafka/data/lost+found
+              
+              mkdir -p /var/lib/kafka/data
+              
+              chmod -R 777 /var/lib/kafka/data
+              chown -R 1000:1000 /var/lib/kafka/data
+              
+              echo "Kafka data directory prepared successfully"
           volumeMounts:
             - name: kafka-data
               mountPath: /var/lib/kafka/data
@@ -46,7 +57,7 @@ spec:
             - name: KAFKA_BROKER_ID
               value: "1"
             - name: KAFKA_ZOOKEEPER_CONNECT
-              value: "{{ include "multitenant-app.fullname" . }}-zookeeper:{{ .Values.zookeeper.service.port }}"
+              value: "{{ include "multitenant-app.fullname" . }}-zookeeper:{{ .Values.kafka.zookeeper.service.port }}"
             - name: KAFKA_ADVERTISED_LISTENERS
               value: "PLAINTEXT://{{ include "multitenant-app.fullname" . }}-kafka:{{ .Values.kafka.service.port }}"
             - name: KAFKA_LISTENERS
