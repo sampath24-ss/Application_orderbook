@@ -23,6 +23,7 @@ backend:
     targetCPUUtilizationPercentage: 75
 
 frontend:
+  enabled: true
   replicaCount: 2
   image:
     repository: sxmpath577/multitenant-frontend
@@ -37,6 +38,7 @@ frontend:
       memory: 256Mi
 
 postgres:
+  enabled: true
   persistence:
     size: 20Gi
   resources:
@@ -48,6 +50,7 @@ postgres:
       memory: 2Gi
 
 redis:
+  enabled: true
   resources:
     limits:
       cpu: 500m
@@ -57,6 +60,7 @@ redis:
       memory: 256Mi
 
 kafka:
+  enabled: true
   persistence:
     size: 10Gi
   resources:
