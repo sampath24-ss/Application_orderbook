@@ -138,3 +138,19 @@ Kafka selector labels
 {{ include "multitenant-app.selectorLabels" . }}
 app.kubernetes.io/component: messaging
 {{- end }}
+
+{{/*
+Zookeeper labels
+*/}}
+{{- define "multitenant-app.zookeeper.labels" -}}
+{{ include "multitenant-app.labels" . }}
+app.kubernetes.io/component: zookeeper
+{{- end }}
+
+{{/*
+Zookeeper selector labels
+*/}}
+{{- define "multitenant-app.zookeeper.selectorLabels" -}}
+{{ include "multitenant-app.selectorLabels" . }}
+app.kubernetes.io/component: zookeeper
+{{- end }}
