@@ -81,18 +81,57 @@ redis:
       cpu: 100m
       memory: 128Mi
 
+
+zookeeper:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: bitnami/zookeeper
+    tag: "3.9"
+    pullPolicy: IfNotPresent
+  env:
+    - name: ALLOW_ANONYMOUS_LOGIN
+      value: "yes"
+    - name: ZOO_PORT_NUMBER
+      value: "2181"
+  service:
+    type: ClusterIP
+    port: 2181
+  persistence:
+    enabled: true
+    accessMode: ReadWriteOnce
+    size: 1Gi
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+
 kafka:
   enabled: true
-  persistence:
-    enabled: false
+  replicaCount: 1
   image:
-    repository: confluentinc/cp-kafka
-    tag: "7.5.0"
+    repository: bitnami/kafka
+    tag: "3.6"
     pullPolicy: IfNotPresent
+  env:
+    - name: KAFKA_CFG_ZOOKEEPER_CONNECT
+      value: "{{ .Release.Name }}-{{ .Chart.Name }}-zookeeper:2181"
+    - name: KAFKA_CFG_LISTENERS
+      value: "PLAINTEXT://:9092"
+    - name: KAFKA_CFG_ADVERTISED_LISTENERS
+      value: "PLAINTEXT://{{ .Release.Name }}-{{ .Chart.Name }}-kafka:9092"
+    - name: ALLOW_PLAINTEXT_LISTENER
+      value: "yes"
+    - name: KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE
+      value: "true"
+    - name: KAFKA_CFG_LOG_RETENTION_HOURS
+      value: "168"
   service:
     type: ClusterIP
     port: 9092
-    targetPort: 9092
   persistence:
     enabled: true
     accessMode: ReadWriteOnce
@@ -104,22 +143,6 @@ kafka:
     requests:
       cpu: 250m
       memory: 512Mi
-  initContainers:
-    - name: volume-permissions
-      image: busybox:latest
-      command: ['sh', '-c', 'chown -R 1000:1000 /var/lib/kafka/data && chmod -R 755 /var/lib/kafka/data']
-      volumeMounts:
-        - name: kafka-data
-          mountPath: /var/lib/kafka/data
-      securityContext:
-        runAsUser: 0
-  zookeeper:
-    enabled: true
-    image:
-      repository: confluentinc/cp-zookeeper
-      tag: "7.5.0"
-    service:
-      port: 2181
 
 ingress:
   enabled: false
@@ -139,13 +162,13 @@ networkPolicy:
 
 configMap:
   data:
-    BACKEND_URL: "http://multitenant-dev-multitenant-app-backend:3000"
-    FRONTEND_URL: "http://multitenant-dev-multitenant-app-frontend:80"
-    DATABASE_HOST: "multitenant-dev-multitenant-app-postgres"
+    BACKEND_URL: "http://{{ .Release.Name }}-{{ .Chart.Name }}-backend:3000"
+    FRONTEND_URL: "http://{{ .Release.Name }}-{{ .Chart.Name }}-frontend:80"
+    DATABASE_HOST: "{{ .Release.Name }}-{{ .Chart.Name }}-postgres"
     DATABASE_PORT: "5432"
-    REDIS_HOST: "multitenant-dev-multitenant-app-redis"
+    REDIS_HOST: "{{ .Release.Name }}-{{ .Chart.Name }}-redis"
     REDIS_PORT: "6379"
-    KAFKA_BROKERS: "kafka-service:9092"
+    KAFKA_BROKERS: "{{ .Release.Name }}-{{ .Chart.Name }}-kafka:9092"
 
 secrets:
   data:
