@@ -173,58 +173,21 @@ kafka:
       securityContext:
         runAsUser: 0
   
-  zookeeper:
-    enabled: true
-    
-    image:
-      repository: confluentinc/cp-zookeeper
-      tag: "7.5.0"
-      pullPolicy: IfNotPresent
-    
-    service:
-      port: 2181
-    
-    persistence:
-      enabled: true
-      size: 2Gi
-    
-    resources:
-      limits:
-        cpu: 500m
-        memory: 1Gi
-      requests:
-        cpu: 250m
-        memory: 512Mi
-    
-    initContainers:
-      - name: volume-permissions
-        image: busybox:latest
-        command: ['sh', '-c', 'chown -R 1000:1000 /var/lib/zookeeper && chmod -R 755 /var/lib/zookeeper']
-        volumeMounts:
-          - name: zookeeper-data
-            mountPath: /var/lib/zookeeper/data
-          - name: zookeeper-logs
-            mountPath: /var/lib/zookeeper/log
-        securityContext:
-          runAsUser: 0
+zookeeper:
   enabled: true
-  
   image:
     repository: confluentinc/cp-zookeeper
     tag: "7.5.0"
     pullPolicy: IfNotPresent
-  
   service:
     type: ClusterIP
     port: 2181
     targetPort: 2181
-  
   persistence:
     enabled: true
     storageClass: ""
     accessMode: ReadWriteOnce
     size: 2Gi
-  
   resources:
     limits:
       cpu: 500m
@@ -232,7 +195,6 @@ kafka:
     requests:
       cpu: 250m
       memory: 512Mi
-  
   initContainers:
     - name: volume-permissions
       image: busybox:latest
@@ -244,7 +206,6 @@ kafka:
           mountPath: /var/lib/zookeeper/log
       securityContext:
         runAsUser: 0
-
 ingress:
   enabled: false
   className: "nginx"
