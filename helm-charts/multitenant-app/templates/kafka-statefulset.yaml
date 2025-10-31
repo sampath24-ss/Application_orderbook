@@ -57,7 +57,7 @@ spec:
             - name: KAFKA_BROKER_ID
               value: "1"
             - name: KAFKA_ZOOKEEPER_CONNECT
-              value: "{{ include "multitenant-app.fullname" . }}-zookeeper-0.{{ include "multitenant-app.fullname" . }}-zookeeper:{{ .Values.kafka.zookeeper.service.port }}"
+              value: "{{ include "multitenant-app.fullname" . }}-zookeeper-0.{{ include "multitenant-app.fullname" . }}-zookeeper.{{ .Values.global.namespace }}.svc.cluster.local:{{ .Values.zookeeper.service.port }}"
             - name: KAFKA_ADVERTISED_LISTENERS
               value: "PLAINTEXT://{{ include "multitenant-app.fullname" . }}-kafka-0.{{ include "multitenant-app.fullname" . }}-kafka:{{ .Values.kafka.service.port }}"
             - name: KAFKA_LISTENERS
