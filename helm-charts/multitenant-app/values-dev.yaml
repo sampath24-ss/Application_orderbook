@@ -135,13 +135,13 @@ networkPolicy:
 
 configMap:
   data:
-    BACKEND_URL: "http://{{ .Release.Name }}-{{ .Chart.Name }}-backend:3000"
-    FRONTEND_URL: "http://{{ .Release.Name }}-{{ .Chart.Name }}-frontend:80"
-    DATABASE_HOST: "{{ .Release.Name }}-{{ .Chart.Name }}-postgres"
+    BACKEND_URL: "http://{{ .Release.Name }}-backend:3000"
+    FRONTEND_URL: "http://{{ .Release.Name }}-frontend:80"
+    DATABASE_HOST: "{{ .Release.Name }}-postgres"
     DATABASE_PORT: "5432"
-    REDIS_HOST: "{{ .Release.Name }}-{{ .Chart.Name }}-redis"
+    REDIS_HOST: "{{ .Release.Name }}-redis"
     REDIS_PORT: "6379"
-    KAFKA_BROKERS: "{{ .Release.Name }}-{{ .Chart.Name }}-kafka:9092"
+    KAFKA_BROKERS: "{{ .Release.Name }}-kafka:9092"
 
 secrets:
   data:
