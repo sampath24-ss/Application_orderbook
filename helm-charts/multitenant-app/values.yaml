@@ -163,16 +163,6 @@ kafka:
       cpu: 500m
       memory: 1Gi
   
-  initContainers:
-    - name: volume-permissions
-      image: busybox:latest
-      command: ['sh', '-c', 'chown -R 1000:1000 /var/lib/kafka/data && chmod -R 755 /var/lib/kafka/data']
-      volumeMounts:
-        - name: kafka-data
-          mountPath: /var/lib/kafka/data
-      securityContext:
-        runAsUser: 0
-  
 zookeeper:
   enabled: true
   image:
@@ -195,17 +185,6 @@ zookeeper:
     requests:
       cpu: 250m
       memory: 512Mi
-  initContainers:
-    - name: volume-permissions
-      image: busybox:latest
-      command: ['sh', '-c', 'chown -R 1000:1000 /var/lib/zookeeper && chmod -R 755 /var/lib/zookeeper']
-      volumeMounts:
-        - name: zookeeper-data
-          mountPath: /var/lib/zookeeper/data
-        - name: zookeeper-logs
-          mountPath: /var/lib/zookeeper/log
-      securityContext:
-        runAsUser: 0
 ingress:
   enabled: false
   className: "nginx"
