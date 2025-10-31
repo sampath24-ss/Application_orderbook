@@ -145,10 +145,9 @@ configMap:
 
 secrets:
   data:
-    DATABASE_PASSWORD: "cG9zdGdyZXMxMjM="
-    REDIS_PASSWORD: "cmVkaXMxMjM="
-    JWT_SECRET: "bXlzZWNyZXRqd3Q="
-    API_KEY: ""
+    DATABASE_PASSWORD: "postgres123"
+    REDIS_PASSWORD: "redis123"
+    JWT_SECRET: "mysecretjwt"
 
 serviceAccount:
   create: true
