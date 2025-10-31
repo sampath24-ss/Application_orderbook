@@ -1,29 +1,27 @@
-{{- if and .Values.kafka.enabled .Values.kafka.zookeeper.enabled }}
+{{- if .Values.zookeeper.enabled }}
 apiVersion: v1
 kind: Service
 metadata:
   name: {{ include "multitenant-app.fullname" . }}-zookeeper
   namespace: {{ .Values.global.namespace }}
   labels:
-    {{- include "multitenant-app.labels" . | nindent 4 }}
-    app.kubernetes.io/component: zookeeper
+    {{- include "multitenant-app.zookeeper.labels" . | nindent 4 }}
 spec:
   type: ClusterIP
+  clusterIP: None
   ports:
-    - port: {{ .Values.kafka.zookeeper.service.port }}
+    - port: {{ .Values.zookeeper.service.port }}
       targetPort: client
       protocol: TCP
       name: client
     - port: 2888
-      targetPort: server
+      targetPort: follower
       protocol: TCP
-      name: server
+      name: follower
     - port: 3888
-      targetPort: leader-election
+      targetPort: election
       protocol: TCP
-      name: leader-election
+      name: election
   selector:
-    {{- include "multitenant-app.selectorLabels" . | nindent 4 }}
-    app.kubernetes.io/component: zookeeper
-  clusterIP: None
+    {{- include "multitenant-app.zookeeper.selectorLabels" . | nindent 4 }}
 {{- end }}
