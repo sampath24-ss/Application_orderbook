@@ -1,6 +1,6 @@
 global:
   environment: development
-  namespace: multitenant
+  namespace: ""
 
 nameOverride: ""
 fullnameOverride: ""
