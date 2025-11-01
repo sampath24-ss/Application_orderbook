@@ -23,7 +23,7 @@ spec:
         - name: backend
           image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
           imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
-          ports:
+          ports: 
             - name: http
               containerPort: {{ .Values.backend.service.targetPort }}
               protocol: TCP
@@ -43,27 +43,27 @@ spec:
                 configMapKeyRef:
                   name: {{ include "multitenant-app.fullname" . }}-config
                   key: LOG_LEVEL
-            - name: DATABASE_HOST
+            - name: DB_HOST
               valueFrom:
                 configMapKeyRef:
                   name: {{ include "multitenant-app.fullname" . }}-config
                   key: DATABASE_HOST
-            - name: DATABASE_PORT
+            - name: DB_PORT
               valueFrom:
                 configMapKeyRef:
                   name: {{ include "multitenant-app.fullname" . }}-config
                   key: DATABASE_PORT
-            - name: DATABASE_NAME
+            - name: DB_NAME
               valueFrom:
                 configMapKeyRef:
                   name: {{ include "multitenant-app.fullname" . }}-config
                   key: DATABASE_NAME
-            - name: DATABASE_USER
+            - name: DB_USER
               valueFrom:
                 configMapKeyRef:
                   name: {{ include "multitenant-app.fullname" . }}-config
                   key: DATABASE_USER
-            - name: DATABASE_PASSWORD
+            - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ include "multitenant-app.fullname" . }}-secret
