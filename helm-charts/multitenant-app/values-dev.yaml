@@ -137,7 +137,7 @@ configMap:
   data:
     BACKEND_URL: "http://{{ .Release.Name }}-backend:3000"
     FRONTEND_URL: "http://{{ .Release.Name }}-frontend:80"
-    DATABASE_HOST: "{{ .Release.Name }}-postgres-0.{{ .Release.Name }}-postgres"
+    DATABASE_HOST: "{{ .Release.Name }}-postgres-0.{{ .Release.Name }}-postgres.{{ .Values.global.namespace }}.svc.cluster.local"
     DATABASE_PORT: "5432"
     REDIS_HOST: "{{ .Release.Name }}-redis"
     REDIS_PORT: "6379"
