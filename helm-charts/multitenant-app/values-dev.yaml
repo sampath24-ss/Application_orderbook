@@ -141,7 +141,7 @@ configMap:
     DATABASE_PORT: "5432"
     REDIS_HOST: "{{ .Release.Name }}-redis"
     REDIS_PORT: "6379"
-    KAFKA_BROKERS: "{{ .Release.Name }}-kafka-0.{{ .Release.Name }}-kafka-client:9092"
+    KAFKA_BROKERS: "{{ .Release.Name }}-kafka-client:9092"
 
 secrets:
   data:
