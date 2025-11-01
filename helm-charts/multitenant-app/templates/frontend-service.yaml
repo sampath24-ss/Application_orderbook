@@ -5,7 +5,8 @@ metadata:
   name: {{ include "multitenant-app.fullname" . }}-frontend
   namespace: {{ .Values.global.namespace }}
   labels:
-    {{- include "multitenant-app.frontend.labels" . | nindent 4 }}
+    {{- include "multitenant-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
 spec:
   type: {{ .Values.frontend.service.type }}
   ports:
@@ -13,6 +14,10 @@ spec:
       targetPort: {{ .Values.frontend.service.targetPort }}
       protocol: TCP
       name: http
+      {{- if and (eq .Values.frontend.service.type "NodePort") .Values.frontend.service.nodePort }}
+      nodePort: {{ .Values.frontend.service.nodePort }}
+      {{- end }}
   selector:
-    {{- include "multitenant-app.frontend.selectorLabels" . | nindent 4 }}
+    {{- include "multitenant-app.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
 {{- end }}
