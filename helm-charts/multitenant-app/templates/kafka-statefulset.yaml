@@ -7,7 +7,7 @@ metadata:
   labels:
     {{- include "multitenant-app.kafka.labels" . | nindent 4 }}
 spec:
-  serviceName: {{ include "multitenant-app.fullname" . }}-kafka
+  serviceName: {{ include "multitenant-app.fullname" . }}-kafka-client
   replicas: 1
   selector:
     matchLabels:
