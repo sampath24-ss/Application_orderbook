@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: multitenant-app-dev
+  namespace: argocd
+spec:
+  project: default
+  
+  source:
+    repoURL: https://github.com/sampath24-ss/Application_orderbook.git
+    targetRevision: develop
+    path: helm-charts/multitenant-app
+    helm:
+      valueFiles:
+        - values.yaml
+        - values-dev.yaml
+  
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: multitenant-dev
+  
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
