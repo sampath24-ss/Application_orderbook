@@ -30,6 +30,10 @@ frontend:
     repository: sxmpath577/multitenant-frontend
     tag: "prod-latest"
     pullPolicy: Always
+  service:
+    type: ClusterIP
+    port: 3000
+    targetPort: 3000
   resources:
     limits:
       cpu: 1000m
