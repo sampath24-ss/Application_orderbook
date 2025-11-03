@@ -7,7 +7,7 @@ backend:
   replicaCount: 5
   image:
     repository: sxmpath577/multitenant-backend
-    tag: "prod-latest"
+    tag: "latest"
     pullPolicy: Always
   resources:
     limits:
@@ -28,7 +28,7 @@ frontend:
   replicaCount: 3
   image:
     repository: sxmpath577/multitenant-frontend
-    tag: "prod-latest"
+    tag: "latest"
     pullPolicy: Always
   service:
     type: ClusterIP
