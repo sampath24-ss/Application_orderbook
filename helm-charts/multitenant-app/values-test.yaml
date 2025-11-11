@@ -82,3 +82,11 @@ ingress:
 
 networkPolicy:
   enabled: false
+
+fluentd:
+  enabled: true
+  elasticsearch:
+    host: "elasticsearch-test.logging.svc.cluster.local"
+
+environment: "test"
+clusterName: "test-cluster"

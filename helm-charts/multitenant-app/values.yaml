@@ -234,3 +234,29 @@ secrets:
     REDIS_PASSWORD: ""
     JWT_SECRET: ""
     API_KEY: ""
+
+fluentd:
+  enabled: true  # Set to false to disable fluentd daemonset
+  image:
+    repository: fluent/fluentd-kubernetes-daemonset
+    tag: v1.16-debian-elasticsearch7-1
+    pullPolicy: IfNotPresent
+  
+  # Elasticsearch configuration (where logs will be sent)
+  elasticsearch:
+    host: "elasticsearch.logging.svc.cluster.local"
+    port: "9200"
+    scheme: "http"
+  
+  # Resource limits and requests
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+# Cluster metadata (used by fluentd for tagging logs)
+clusterName: "multitenant-cluster"
+environment: "dev"

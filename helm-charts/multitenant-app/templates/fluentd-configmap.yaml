@@ -1,0 +1,71 @@
+{{- if .Values.fluentd.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "multitenant-app.fullname" . }}-fluentd-config
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "multitenant-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: logging
+data:
+  fluent.conf: |
+    <source>
+      @type tail
+      path /var/log/containers/*.log
+      pos_file /var/log/fluentd-containers.log.pos
+      tag kubernetes.*
+      read_from_head true
+      <parse>
+        @type json
+        time_format %Y-%m-%dT%H:%M:%S.%NZ
+      </parse>
+    </source>
+
+    <filter kubernetes.**>
+      @type kubernetes_metadata
+      @id filter_kube_metadata
+      kubernetes_url "#{ENV['FLUENT_FILTER_KUBERNETES_URL'] || 'https://' + ENV.fetch('KUBERNETES_SERVICE_HOST') + ':' + ENV.fetch('KUBERNETES_SERVICE_PORT') + '/api'}"
+      verify_ssl "#{ENV['KUBERNETES_VERIFY_SSL'] || true}"
+      ca_file "#{ENV['KUBERNETES_CA_FILE']}"
+    </filter>
+
+    <filter kubernetes.**>
+      @type record_transformer
+      <record>
+        cluster_name {{ .Values.clusterName }}
+        environment {{ .Values.environment }}
+      </record>
+    </filter>
+
+    <match kubernetes.**>
+      @type elasticsearch
+      @id out_es
+      @log_level info
+      include_tag_key true
+      host "#{ENV['FLUENT_ELASTICSEARCH_HOST']}"
+      port "#{ENV['FLUENT_ELASTICSEARCH_PORT']}"
+      scheme "#{ENV['FLUENT_ELASTICSEARCH_SCHEME'] || 'http'}"
+      ssl_verify "#{ENV['FLUENT_ELASTICSEARCH_SSL_VERIFY'] || 'true'}"
+      logstash_format true
+      logstash_prefix kubernetes
+      <buffer>
+        @type file
+        path /var/log/fluentd-buffers/kubernetes.system.buffer
+        flush_mode interval
+        retry_type exponential_backoff
+        flush_thread_count 2
+        flush_interval 5s
+        retry_forever
+        retry_max_interval 30
+        chunk_limit_size 2M
+        queue_limit_length 8
+        overflow_action block
+      </buffer>
+    </match>
+{{- end }}
+
+
+
+
+
+

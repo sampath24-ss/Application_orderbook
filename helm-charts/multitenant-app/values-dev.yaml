@@ -156,3 +156,11 @@ serviceAccount:
 
 rbac:
   create: true
+
+fluentd:
+  enabled: true
+  elasticsearch:
+    host: "elasticsearch-dev.logging.svc.cluster.local"
+
+environment: "dev"
+clusterName: "dev-cluster"
