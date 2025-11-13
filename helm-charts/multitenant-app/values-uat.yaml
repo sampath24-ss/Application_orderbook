@@ -36,6 +36,12 @@ frontend:
     requests:
       cpu: 250m
       memory: 256Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
 
 postgres:
   enabled: true

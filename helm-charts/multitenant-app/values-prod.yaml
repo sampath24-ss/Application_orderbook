@@ -42,10 +42,18 @@ frontend:
       cpu: 250m
       memory: 256Mi
   autoscaling:
-    enabled: false
-    minReplicas: 2
-    maxReplicas: 5
-    targetCPUUtilizationPercentage: 70
+    enabled: true
+    minReplicas: 3        # Always run at least 3 pods
+    maxReplicas: 15       # Scale up to 15 pods under load
+    targetCPUUtilizationPercentage: 65
+    targetMemoryUtilizationPercentage: 75
+    
+    # More aggressive scaling in production
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      percentValue: 100
+      podsValue: 3        # Add 3 pods at a time in prod
+      periodSeconds: 15   # Check every 15 seconds
 
 postgres:
   enabled: true
