@@ -9,9 +9,3 @@ metadata:
   annotations:
     description: "Namespace for {{ .Values.global.environment }} environment"
 {{- end }}
-
-
-
-
-
-

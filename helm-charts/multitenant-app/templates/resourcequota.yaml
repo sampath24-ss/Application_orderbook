@@ -1,0 +1,47 @@
+{{- if .Values.resourceQuota.enabled }}
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: {{ include "multitenant-app.fullname" . }}-quota
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "multitenant-app.labels" . | nindent 4 }}
+spec:
+  hard:
+    # Compute Resources
+    requests.cpu: {{ .Values.resourceQuota.hard.requests.cpu | quote }}
+    requests.memory: {{ .Values.resourceQuota.hard.requests.memory | quote }}
+    limits.cpu: {{ .Values.resourceQuota.hard.limits.cpu | quote }}
+    limits.memory: {{ .Values.resourceQuota.hard.limits.memory | quote }}
+    
+    # Storage Resources
+    {{- if .Values.resourceQuota.hard.requests.storage }}
+    requests.storage: {{ .Values.resourceQuota.hard.requests.storage | quote }}
+    {{- end }}
+    {{- if .Values.resourceQuota.hard.persistentvolumeclaims }}
+    persistentvolumeclaims: {{ .Values.resourceQuota.hard.persistentvolumeclaims | quote }}
+    {{- end }}
+    
+    # Object Counts
+    {{- if .Values.resourceQuota.hard.pods }}
+    pods: {{ .Values.resourceQuota.hard.pods | quote }}
+    {{- end }}
+    {{- if .Values.resourceQuota.hard.services }}
+    services: {{ .Values.resourceQuota.hard.services | quote }}
+    {{- end }}
+    {{- if .Values.resourceQuota.hard.configmaps }}
+    configmaps: {{ .Values.resourceQuota.hard.configmaps | quote }}
+    {{- end }}
+    {{- if .Values.resourceQuota.hard.secrets }}
+    secrets: {{ .Values.resourceQuota.hard.secrets | quote }}
+    {{- end }}
+    {{- if .Values.resourceQuota.hard.replicationcontrollers }}
+    replicationcontrollers: {{ .Values.resourceQuota.hard.replicationcontrollers | quote }}
+    {{- end }}
+    {{- if .Values.resourceQuota.hard.services.loadbalancers }}
+    services.loadbalancers: {{ .Values.resourceQuota.hard.services.loadbalancers | quote }}
+    {{- end }}
+    {{- if .Values.resourceQuota.hard.services.nodeports }}
+    services.nodeports: {{ .Values.resourceQuota.hard.services.nodeports | quote }}
+    {{- end }}
+{{- end }}

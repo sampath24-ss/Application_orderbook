@@ -12,7 +12,7 @@ spec:
     - port: {{ .Values.redis.service.port }}
       targetPort: {{ .Values.redis.service.targetPort }}
       protocol: TCP
-      name: redis
+      name: redis 
   selector:
     {{- include "multitenant-app.redis.selectorLabels" . | nindent 4 }}
 {{- end }}

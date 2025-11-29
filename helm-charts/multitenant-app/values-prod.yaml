@@ -53,7 +53,7 @@ frontend:
       stabilizationWindowSeconds: 0
       percentValue: 100
       podsValue: 3        # Add 3 pods at a time in prod
-      periodSeconds: 15   # Check every 15 seconds
+      periodSeconds: 15
 
 postgres:
   enabled: true
