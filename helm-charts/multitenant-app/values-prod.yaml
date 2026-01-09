@@ -47,7 +47,12 @@ frontend:
     maxReplicas: 15       # Scale up to 15 pods under load
     targetCPUUtilizationPercentage: 65
     targetMemoryUtilizationPercentage: 75
-    
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
     # More aggressive scaling in production
     scaleUp:
       stabilizationWindowSeconds: 0

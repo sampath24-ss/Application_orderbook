@@ -115,7 +115,7 @@ postgres:
 
 redis:
   enabled: true
-  
+   
   image:
     repository: redis
     tag: "7-alpine"
