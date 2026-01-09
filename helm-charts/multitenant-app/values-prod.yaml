@@ -146,6 +146,25 @@ fluentd:
     requests:
       cpu: 200m
       memory: 256Mi
-
+resourceQuota:
+  enabled: true
+  hard:
+    requests:
+      cpu: "10"
+      memory: "20Gi"
+      storage: "100Gi"
+    limits:
+      cpu: "20"
+      memory: "40Gi"
+    pods: "100"
+    services: "50"
+    configmaps: "50"
+    secrets: "50"
+    replicationcontrollers: "20"
+    persistentvolumeclaims: "10"
+    services:
+      loadbalancers: "2"
+      nodeports: "5"
+      
 environment: "prod"
 clusterName: "prod-cluster"
