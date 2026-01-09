@@ -28,11 +28,13 @@ spec:
               containerPort: {{ .Values.frontend.service.targetPort }}
               protocol: TCP
           env:
+            - name: BACKEND_HOST
+              value: "{{ .Release.Name }}-backend"
             - name: REACT_APP_BACKEND_URL
               valueFrom:
                 configMapKeyRef:
-                  name: {{ include "multitenant-app.fullname" . }}-config
-                  key: BACKEND_URL
+                name: {{ include "multitenant-app.fullname" . }}-config
+                key: BACKEND_URL
             - name: REACT_APP_ENVIRONMENT
               valueFrom:
                 configMapKeyRef:
