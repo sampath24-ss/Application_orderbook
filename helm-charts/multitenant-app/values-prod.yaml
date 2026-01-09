@@ -162,9 +162,8 @@ resourceQuota:
     secrets: "50"
     replicationcontrollers: "20"
     persistentvolumeclaims: "10"
-    services:
-      loadbalancers: "2"
-      nodeports: "5"
+    servicesLoadbalancers: "2"
+    servicesNodeports: "5"
 
 environment: "prod"
 clusterName: "prod-cluster"

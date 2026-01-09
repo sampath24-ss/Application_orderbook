@@ -38,10 +38,10 @@ spec:
     {{- if .Values.resourceQuota.hard.replicationcontrollers }}
     replicationcontrollers: {{ .Values.resourceQuota.hard.replicationcontrollers | quote }}
     {{- end }}
-    {{- if .Values.resourceQuota.hard.services.loadbalancers }}
-    services.loadbalancers: {{ .Values.resourceQuota.hard.services.loadbalancers | quote }}
+    {{- if .Values.resourceQuota.hard.servicesLoadbalancers }}
+    services.loadbalancers: {{ .Values.resourceQuota.hard.servicesLoadbalancers | quote }}
     {{- end }}
-    {{- if .Values.resourceQuota.hard.services.nodeports }}
-    services.nodeports: {{ .Values.resourceQuota.hard.services.nodeports | quote }}
+    {{- if .Values.resourceQuota.hard.servicesNodeports }}
+    services.nodeports: {{ .Values.resourceQuota.hard.servicesNodeports | quote }}
     {{- end }}
 {{- end }}
