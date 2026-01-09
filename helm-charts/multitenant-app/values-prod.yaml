@@ -136,7 +136,7 @@ serviceAccount:
   create: true
 
 fluentd:
-  enabled: true
+  enabled: false
   elasticsearch:
     host: "elasticsearch-prod.logging.svc.cluster.local"
   resources:
@@ -146,6 +146,7 @@ fluentd:
     requests:
       cpu: 200m
       memory: 256Mi
+
 resourceQuota:
   enabled: true
   hard:
@@ -165,6 +166,6 @@ resourceQuota:
     services:
       loadbalancers: "2"
       nodeports: "5"
-      
+
 environment: "prod"
 clusterName: "prod-cluster"
