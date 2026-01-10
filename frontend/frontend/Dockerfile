@@ -14,7 +14,7 @@ FROM nginx:alpine
 
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY nginx.conf /etc/nginx/conf.d/default.conf.template
 
 RUN echo 'include /etc/nginx/conf.d/*.conf;' >> /etc/nginx/nginx.conf
 
